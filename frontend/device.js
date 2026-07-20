@@ -1,17 +1,15 @@
 // Device console: auto-loads the live scrcpy stream for one instance and
-// provides a sidebar to switch player / open ws-scrcpy tools.
+// provides a sidebar to switch player, toggle fit-to-screen, open ws-scrcpy
+// tools beside the stream, and one-click root the device.
 //
-// We construct the ws-scrcpy stream URL exactly the way ws-scrcpy's own device
-// list does (StreamClientScrcpy + BaseDeviceTracker.buildLink):
-//
+// Stream URL is built exactly like ws-scrcpy's own device list (see
+// StreamClientScrcpy + BaseDeviceTracker.buildLink):
 //   http://<host>:<wsPort>/#!action=stream&udid=<serial>&player=<code>
-//        &ws=<ws://<host>:<wsPort>/?action=proxy-adb&remote=tcp:8886&udid=<serial>>
-//
-// 8886 is the scrcpy server port (Constants.SERVER_PORT); ws-scrcpy auto-starts
-// that server on every tracked device, so the URL works without visiting the
-// device list first.
+//        &ws=ws://<host>:<wsPort>/?action=proxy-adb&remote=tcp:8886&udid=<serial>
+//   (&fit=1 → fit-to-screen; honored by our patched ws-scrcpy build)
+// 8886 = scrcpy SERVER_PORT. Tool URLs are just #!action=<a>&udid=<serial>.
 const $ = (s) => document.querySelector(s);
-const api = (p) => fetch(p).then((r) => r.json());
+const api = (p, opts) => fetch(p, opts).then((r) => r.json());
 
 const SCRCPY_SERVER_PORT = 8886;
 const PLAYERS = [
@@ -19,6 +17,7 @@ const PLAYERS = [
   { code: 'mse', name: 'H264 Converter' },
   { code: 'tinyh264', name: 'Tiny H264' },
 ];
+const TOOL_NAMES = { shell: 'Shell', devtools: 'Devtools', 'list-files': 'List files' };
 
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
@@ -26,22 +25,18 @@ const id = params.get('id');
 let cfg = { wsScrcpyPort: 8000 };
 let device = null;
 let currentPlayer = params.get('player') || 'broadway';
+let fit = true;
 
-function wsHost() { return location.hostname; }
-function wsPort() { return cfg.wsScrcpyPort || 8000; }
-
-function proxyWs(serial) {
-  return `ws://${wsHost()}:${wsPort()}/?action=proxy-adb`
-    + `&remote=tcp:${SCRCPY_SERVER_PORT}&udid=${serial}`;
-}
+const wsHost = () => location.hostname;
+const wsPort = () => cfg.wsScrcpyPort || 8000;
+const proxyWs = (serial) =>
+  `ws://${wsHost()}:${wsPort()}/?action=proxy-adb&remote=tcp:${SCRCPY_SERVER_PORT}&udid=${serial}`;
 
 function streamUrl(serial, player) {
-  const q = new URLSearchParams({
-    action: 'stream', udid: serial, player, ws: proxyWs(serial),
-  });
+  const q = new URLSearchParams({ action: 'stream', udid: serial, player, ws: proxyWs(serial) });
+  if (fit) q.set('fit', '1');
   return `http://${wsHost()}:${wsPort()}/#!${q.toString()}`;
 }
-
 function toolUrl(serial, action) {
   const q = new URLSearchParams({ action, udid: serial });
   return `http://${wsHost()}:${wsPort()}/#!${q.toString()}`;
@@ -55,30 +50,83 @@ function renderPlayers() {
 
 function loadStream() {
   if (!device) return;
-  $('#stream-frame').src = streamUrl(device.serial, currentPlayer);
-  $('#open-tab').href = streamUrl(device.serial, currentPlayer);
+  const url = streamUrl(device.serial, currentPlayer);
+  $('#stream-frame').src = url;
+  $('#open-tab').href = url;
   renderPlayers();
+}
+
+function openTool(action) {
+  if (!device) return;
+  const url = toolUrl(device.serial, action);
+  $('#tool-title').textContent = `${TOOL_NAMES[action] || action} — ${device.serial}`;
+  $('#tool-open').href = url;
+  $('#tool-frame').src = url;
+  $('#tool-panel').classList.remove('hidden');
 }
 
 async function boot() {
   cfg = await api('/api/config');
   device = await api(`/api/instances/${id}`);
-  if (!device || device.error) {
-    $('#side-msg').textContent = 'Device not found.';
-    return;
-  }
+  if (!device || device.error) { $('#side-msg').textContent = 'Device not found.'; return; }
+
   $('#dev-name').textContent = device.name;
   $('#dev-serial').textContent = device.serial;
-  $('#dev-status').innerHTML = device.status === 'running'
-    ? '<span class="badge ok">running</span>'
-    : `<span class="badge warn">${device.status}</span>`;
-
+  renderStatus();
   if (device.status !== 'running' || !device.adbOnline) {
     $('#side-msg').innerHTML =
       'Device is not online yet. <a href="/">Go back</a>, Start it, and wait for “running”.';
   }
   loadStream();
+  pollRoot();
 }
+
+function renderStatus() {
+  $('#dev-status').innerHTML = device.status === 'running'
+    ? '<span class="badge ok">running</span>'
+    : `<span class="badge warn">${device.status}</span>`;
+}
+
+// ---- root ----
+let rooting = false;
+async function pollRoot() {
+  const d = await api(`/api/instances/${id}`);
+  if (!d || d.error) return;
+  device = d;
+  const s = $('#root-status');
+  if (d.rootState === 'rooted') {
+    s.innerHTML = '✅ Rooted (Magisk). Open the Magisk app on the device to finish, then install LSPosed etc.';
+    $('#root-btn').disabled = false;
+    $('#root-btn').textContent = '⚡ Re-root (Magisk)';
+    rooting = false;
+  } else if (d.rootState === 'rooting') {
+    s.textContent = '⏳ Rooting… building a Magisk image and rebooting the device (can take a few minutes).';
+    $('#root-btn').disabled = true;
+    rooting = true;
+    setTimeout(pollRoot, 4000);
+  } else if (d.rootState === 'failed') {
+    s.innerHTML = '❌ Root failed. See <code>docker logs</code> for the rooter, or retry.';
+    $('#root-btn').disabled = false;
+    rooting = false;
+  } else {
+    s.textContent = 'Adds Magisk so you can install LSPosed/Vector and use su. Keeps your apps & data.';
+  }
+}
+
+$('#root-btn').addEventListener('click', async () => {
+  if (rooting) return;
+  if (!confirm('Root this device with Magisk?\n\nIt builds a Magisk-injected image for this Android version and reboots the device. Your /data (apps & settings) is preserved.')) return;
+  $('#root-btn').disabled = true;
+  $('#root-status').textContent = '⏳ Starting root…';
+  try {
+    await api(`/api/instances/${id}/root`, { method: 'POST' });
+    rooting = true;
+    setTimeout(pollRoot, 3000);
+  } catch (e) {
+    $('#root-status').textContent = 'Error: ' + (e.message || e);
+    $('#root-btn').disabled = false;
+  }
+});
 
 // ---- events ----
 $('#players').addEventListener('click', (e) => {
@@ -87,14 +135,13 @@ $('#players').addEventListener('click', (e) => {
   currentPlayer = b.dataset.player;
   loadStream();
 });
-
-document.querySelectorAll('button[data-tool]').forEach((b) => {
-  b.addEventListener('click', () => {
-    if (!device) return;
-    window.open(toolUrl(device.serial, b.dataset.tool), '_blank', 'noopener');
-  });
+$('#fit-toggle').addEventListener('change', (e) => { fit = e.target.checked; loadStream(); });
+document.querySelectorAll('button[data-tool]').forEach((b) =>
+  b.addEventListener('click', () => openTool(b.dataset.tool)));
+$('#tool-close').addEventListener('click', () => {
+  $('#tool-panel').classList.add('hidden');
+  $('#tool-frame').src = 'about:blank';
 });
-
 $('#reload-stream').addEventListener('click', loadStream);
 
 boot();

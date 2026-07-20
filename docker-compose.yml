@@ -31,3 +31,11 @@ services:
     image: redroid-ws-scrcpy
     network_mode: host          # serves on :8000, shares adb server with backend
     restart: unless-stopped
+
+  # One-shot rooter image (Magisk injector). Never runs as a service — it's under
+  # a profile so `up` won't start it; the backend launches it on demand per root.
+  # Build it with:  docker compose --profile rooter build rooter
+  rooter:
+    build: ./rooter
+    image: redroid-rooter
+    profiles: ["rooter"]

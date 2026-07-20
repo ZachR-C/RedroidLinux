@@ -17,10 +17,13 @@
       <div class="side-group">
         <div class="side-label">Video player</div>
         <div id="players" class="side-buttons"></div>
+        <label class="side-check">
+          <input type="checkbox" id="fit-toggle" checked /> Fit to screen
+        </label>
       </div>
 
       <div class="side-group">
-        <div class="side-label">Tools</div>
+        <div class="side-label">Tools (open beside the screen)</div>
         <div class="side-buttons">
           <button data-tool="shell">Shell</button>
           <button data-tool="devtools">Devtools</button>
@@ -29,19 +32,37 @@
       </div>
 
       <div class="side-group">
+        <div class="side-label">Root</div>
+        <div class="side-buttons">
+          <button id="root-btn" class="primary">⚡ One-click root (Magisk)</button>
+        </div>
+        <p id="root-status" class="side-hint"></p>
+      </div>
+
+      <div class="side-group">
         <div class="side-label">Stream</div>
         <div class="side-buttons">
           <button id="reload-stream">↻ Reload view</button>
           <a id="open-tab" target="_blank" rel="noopener"><button>Open in new tab ↗</button></a>
         </div>
-        <p class="side-hint">Use the ⚙ toolbar inside the view to toggle fit-to-screen, bitrate and resolution.</p>
       </div>
 
       <div id="side-msg" class="side-msg"></div>
     </aside>
 
     <main class="stage">
-      <iframe id="stream-frame" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      <div class="stage-stream">
+        <iframe id="stream-frame" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      </div>
+      <div id="tool-panel" class="tool-panel hidden">
+        <div class="tool-bar">
+          <span id="tool-title">Tool</span>
+          <span class="spacer"></span>
+          <a id="tool-open" target="_blank" rel="noopener" class="ghost">Open in tab ↗</a>
+          <button id="tool-close" class="ghost">✕ Close</button>
+        </div>
+        <iframe id="tool-frame" allow="clipboard-read; clipboard-write"></iframe>
+      </div>
     </main>
   </div>
   <script src="device.js"></script>

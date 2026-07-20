@@ -68,7 +68,16 @@ button.ghost { background: transparent; }
 .side-buttons button { width: 100%; text-align: left; }
 .side-buttons a { text-decoration: none; }
 .side-hint { font-size: 11px; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+.side-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 10px; }
 .side-msg { color: var(--warn); font-size: 12px; margin-top: auto; }
 .side-msg a { color: var(--accent); }
-.stage { flex: 1; background: #05070a; min-width: 0; }
-.stage iframe { width: 100%; height: 100%; border: 0; background: #000; }
+/* stage = stream on top, optional tool panel below */
+.stage { flex: 1; background: #05070a; min-width: 0; display: flex; flex-direction: column; }
+.stage-stream { flex: 1; min-height: 0; }
+.stage-stream iframe { width: 100%; height: 100%; border: 0; background: #000; }
+.tool-panel { height: 45%; border-top: 2px solid var(--line); display: flex; flex-direction: column; background: #0b0e12; }
+.tool-panel.hidden { display: none; }
+.tool-bar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.tool-bar .spacer { flex: 1; }
+.tool-bar a { color: var(--accent); text-decoration: none; }
+.tool-panel iframe { flex: 1; width: 100%; border: 0; background: #fff; }

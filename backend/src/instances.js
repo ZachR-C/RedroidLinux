@@ -33,7 +33,42 @@ async function decorate(rec) {
     status = 'missing'; // record exists but container was removed out-of-band
   }
   const online = status === 'running' ? await adb.isOnline(rec.adbPort) : false;
-  return { ...rec, status, containerId, adbOnline: online, serial: adb.serialFor(rec.adbPort) };
+  return {
+    ...rec, status, containerId, adbOnline: online,
+    serial: adb.serialFor(rec.adbPort),
+    rootState: rec.rootState || (rec.rooted ? 'rooted' : 'none'),
+  };
+}
+
+// Docker container spec for a device record. Shared by create() and re-root
+// (which recreates the container on the Magisk image, same volume/port/geometry).
+function containerSpec(rec) {
+  return {
+    name: containerName(rec.id),
+    Image: rec.image,
+    Tty: true,
+    OpenStdin: true,
+    Labels: { 'redroid.manager': '1', 'redroid.id': rec.id, 'redroid.name': rec.name },
+    // redroid boot args: display geometry + fps. Software-rendered inside a VM
+    // (no GPU passthrough); fine for management/testing.
+    Cmd: [
+      'androidboot.redroid_width=' + rec.width,
+      'androidboot.redroid_height=' + rec.height,
+      'androidboot.redroid_dpi=' + rec.dpi,
+      'androidboot.redroid_fps=' + rec.fps,
+      'androidboot.redroid_gpu_mode=guest',
+    ],
+    HostConfig: {
+      Privileged: true, // required: redroid needs binder / device access
+      // Mount the whole binderfs dir (this host is a binderfs-only kernel, e.g.
+      // Ubuntu 24.04 / 6.8) and let redroid's own init wire up /dev/binder from
+      // it. Mapping individual nodes causes an early-boot race that aborts vold.
+      Binds: [`${rec.dataPath}:/data`, '/dev/binderfs:/dev/binderfs'],
+      PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(rec.adbPort) }] },
+      RestartPolicy: { Name: 'no' },
+    },
+    ExposedPorts: { '5555/tcp': {} },
+  };
 }
 
 export async function list() {
@@ -67,36 +102,11 @@ export async function create({ name, image, width, height, dpi, fps }) {
     height: height || 1280,
     dpi: dpi || 320,
     fps: fps || 30,
+    rootState: 'none',
     createdAt: new Date().toISOString(),
   };
 
-  await docker.createContainer({
-    name: containerName(id),
-    Image: image,
-    Tty: true,
-    OpenStdin: true,
-    Labels: { 'redroid.manager': '1', 'redroid.id': id, 'redroid.name': rec.name },
-    // redroid boot args: display geometry + fps. Software-rendered inside a VM
-    // (no GPU passthrough); fine for management/testing.
-    Cmd: [
-      'androidboot.redroid_width=' + rec.width,
-      'androidboot.redroid_height=' + rec.height,
-      'androidboot.redroid_dpi=' + rec.dpi,
-      'androidboot.redroid_fps=' + rec.fps,
-      'androidboot.redroid_gpu_mode=guest',
-    ],
-    HostConfig: {
-      Privileged: true, // required: redroid needs binder / device access
-      // Mount the whole binderfs dir (this host is a binderfs-only kernel, e.g.
-      // Ubuntu 24.04 / 6.8) and let redroid's own init wire up /dev/binder from
-      // it. Mapping individual nodes causes an early-boot race that aborts vold.
-      Binds: [`${dataPath}:/data`, '/dev/binderfs:/dev/binderfs'],
-      PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(adbPort) }] },
-      RestartPolicy: { Name: 'no' },
-    },
-    ExposedPorts: { '5555/tcp': {} },
-  });
-
+  await docker.createContainer(containerSpec(rec));
   return store.put(rec);
 }
 
@@ -125,6 +135,74 @@ export async function remove(id, { deleteData = false } = {}) {
   if (deleteData) fs.rmSync(rec.dataPath, { recursive: true, force: true });
   store.delete(id);
   return { id, deletedData: deleteData };
+}
+
+// Derive the Magisk image tag from a base image: repo:tag -> repo:tag_magisk.
+function rootedTag(image) {
+  const i = image.lastIndexOf(':');
+  const repo = image.slice(0, i);
+  const tag = image.slice(i + 1).replace(/-latest$/, '');
+  return `${repo}:${tag}_magisk`;
+}
+
+// One-click root: build a Magisk image for this device's Android version, then
+// recreate the container on it (same /data, port, geometry). Long-running, so
+// callers fire it and poll rootState via get(). Idempotent-ish on re-root.
+export async function root(id) {
+  const rec = mustGet(id);
+  if (rec.rootState === 'rooting') return get(id);
+  rec.rootState = 'rooting';
+  store.put(rec);
+  // Run the heavy work detached; status is observed through rootState.
+  doRoot(rec).catch((err) => {
+    console.error('[root] failed:', err.message);
+    const r = store.get(id);
+    if (r) { r.rootState = 'failed'; store.put(r); }
+  });
+  return get(id);
+}
+
+async function doRoot(rec) {
+  const outImage = rootedTag(rec.image);
+
+  // 1) Build the Magisk image via the one-shot rooter container.
+  await runRooter(rec.image, outImage);
+
+  // 2) Recreate the device container on the rooted image (keep /data & port).
+  await adb.disconnect(rec.adbPort).catch(() => {});
+  try { await docker.getContainer(containerName(rec.id)).remove({ force: true }); } catch {}
+  const rooted = { ...rec, image: outImage, rootState: 'rooted', rooted: true };
+  await docker.createContainer(containerSpec(rooted));
+  await docker.getContainer(containerName(rec.id)).start();
+  await adb.connect(rooted.adbPort);
+  store.put(rooted);
+  console.log(`[root] ${rec.id} rooted on ${outImage}`);
+}
+
+// Launch the rooter image as a one-off container and wait for it to finish.
+async function runRooter(baseImage, outImage) {
+  await ensureRooterImage();
+  const container = await docker.createContainer({
+    Image: 'redroid-rooter',
+    Env: [`BASE_IMAGE=${baseImage}`, `OUTPUT_IMAGE=${outImage}`],
+    HostConfig: {
+      AutoRemove: false,
+      Binds: ['/var/run/docker.sock:/var/run/docker.sock'],
+    },
+  });
+  await container.start();
+  const status = await container.wait(); // { StatusCode }
+  const logs = (await container.logs({ stdout: true, stderr: true })).toString();
+  await container.remove({ force: true }).catch(() => {});
+  if (status.StatusCode !== 0) {
+    throw new Error(`rooter exited ${status.StatusCode}\n${logs.slice(-2000)}`);
+  }
+}
+
+async function ensureRooterImage() {
+  try { await docker.getImage('redroid-rooter').inspect(); return; } catch {}
+  throw httpErr(500,
+    'rooter image "redroid-rooter" is not built. Run: docker compose --profile rooter build rooter');
 }
 
 // --- helpers ---------------------------------------------------------------

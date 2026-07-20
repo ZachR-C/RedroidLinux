@@ -32,7 +32,7 @@ log "Running host provisioning (Docker, binder/ashmem, adb, Node)"
 chmod +x provision/*.sh
 ./provision/setup.sh
 
-REST_CMD="cd '$INSTALL_DIR' && ./provision/pull-images.sh && docker compose up -d --build"
+REST_CMD="cd '$INSTALL_DIR' && ./provision/pull-images.sh && docker compose up -d --build && docker compose --profile rooter build rooter"
 
 # A freshly-added docker group membership only applies to new shells/logins.
 # `sg docker` runs the rest of the install with that group active right now,

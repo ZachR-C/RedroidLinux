@@ -31,6 +31,7 @@ app.get('/api/instances/:id', wrap(async (req, res) => {
 app.post('/api/instances', wrap(async (req, res) => res.status(201).json(await instances.create(req.body || {}))));
 app.post('/api/instances/:id/start', wrap(async (req, res) => res.json(await instances.start(req.params.id))));
 app.post('/api/instances/:id/stop', wrap(async (req, res) => res.json(await instances.stop(req.params.id))));
+app.post('/api/instances/:id/root', wrap(async (req, res) => res.status(202).json(await instances.root(req.params.id))));
 app.delete('/api/instances/:id', wrap(async (req, res) =>
   res.json(await instances.remove(req.params.id, { deleteData: req.query.data === 'true' }))));
 
