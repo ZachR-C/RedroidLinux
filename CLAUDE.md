@@ -50,15 +50,23 @@ The user wants changes tested on the real VM, not just locally:
 - `ws-scrcpy/` — built from source; H.264 stream + input in the browser.
 - Both compose services use `network_mode: host` so they SHARE one host adb
   server — backend does `adb connect 127.0.0.1:<port>`, ws-scrcpy then sees it.
-- **Streaming has NO stable static deep-link** in ws-scrcpy 0.9.x. The stream
-  `action=stream` needs a `ws=` websocket URL that ws-scrcpy builds at runtime
-  from the device's interfaces (the "Configure stream" step). Passing
-  `#!action=stream&udid=…&player=…` without `ws` => `Missing required
-  parameter "ws"` => white screen. So the app's "View" button loads the
-  ws-scrcpy **device-list page** (`http://<host>:8000/`); the user clicks
-  "Configure stream" on their serial → interactive view. ws-scrcpy auto-pushes
-  scrcpy-server.jar (1.19-ws7) and starts the server on tcp:8886 — confirmed in
-  its logs. Mouse/touch/keyboard control works through the player.
+- **Streaming — the working direct URL** (reverse-engineered from ws-scrcpy
+  0.9.x `BaseDeviceTracker.buildLink` + `StreamClientScrcpy`). There is no
+  "player=broadway" shortcut; you must include the `ws=` proxy URL yourself:
+  ```
+  http://<host>:8000/#!action=stream&udid=<serial>&player=<code>&ws=<proxyWs>
+  proxyWs = ws://<host>:8000/?action=proxy-adb&remote=tcp:8886&udid=<serial>
+  ```
+  `8886` = scrcpy SERVER_PORT (Constants.ts). Player codes: `broadway`
+  (Broadway.js), `mse` (H264 Converter), `tinyh264` (Tiny H264). Omitting `ws`
+  => `Missing required parameter "ws"` => white screen (the old bug).
+  Tool URLs are simpler — just `#!action=<a>&udid=<serial>` for
+  `shell` / `devtools` / `list-files`. `frontend/device.js` builds all of these;
+  the "View" button opens `/device.html?id=…` which auto-streams + sidebar.
+  Verified: the proxy-adb ws opens and streams device data headlessly.
+- **Images pull on demand** at create time (`ensureImage` in instances.js,
+  `platform: linux/arm64`), so the app can offer all Android 10–16 (full +
+  _64only) without pre-downloading ~24GB. Only _64only boots on Apple Silicon.
 - `frontend/` is bind-mounted into the backend container (`./frontend:/frontend:ro`),
   so UI edits need only `docker compose restart backend`, not a rebuild.
 
