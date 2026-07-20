@@ -83,7 +83,10 @@ export async function create({ name, image, width, height, dpi, fps }) {
     ],
     HostConfig: {
       Privileged: true, // required: redroid needs binder / device access
-      Binds: [`${dataPath}:/data`],
+      // Mount the whole binderfs dir (this host is a binderfs-only kernel, e.g.
+      // Ubuntu 24.04 / 6.8) and let redroid's own init wire up /dev/binder from
+      // it. Mapping individual nodes causes an early-boot race that aborts vold.
+      Binds: [`${dataPath}:/data`, '/dev/binderfs:/dev/binderfs'],
       PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(adbPort) }] },
       RestartPolicy: { Name: 'no' },
     },

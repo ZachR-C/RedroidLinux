@@ -32,20 +32,25 @@ fi
 sudo usermod -aG docker "$USER" || true
 
 # ---------------------------------------------------------------------------
-log "Installing binder/ashmem kernel modules (redroid requirement)"
-# Ubuntu's stock kernel ships these prebuilt in linux-modules-extra. This is the
-# supported path that creates the LEGACY /dev/binder nodes redroid expects
-# (avoids the binderfs-only breakage seen with bleeding-edge custom kernels).
+log "Setting up binder (via binderfs) for redroid"
+# Ubuntu 24.04's stock 6.8 kernel builds binder as a module WITHOUT the legacy
+# static /dev/binder device nodes — it only supports binderfs. So instead of the
+# old `modprobe binder_linux devices=...` trick (which silently creates no nodes
+# on this kernel), we load the module and mount binderfs. redroid's own init
+# then wires up /dev/binder from the mounted binderfs directory.
 sudo apt-get install -y "linux-modules-extra-$(uname -r)" || \
   warn "linux-modules-extra-$(uname -r) not found — you may be on a custom/HWE kernel. See docs/02-redroid-setup.md."
 
-sudo modprobe binder_linux devices="binder,hwbinder,vndbinder" || die "modprobe binder_linux failed"
-sudo modprobe ashmem_linux 2>/dev/null || warn "ashmem_linux not present (fine on kernels where redroid uses memfd)."
+sudo modprobe binder_linux || die "modprobe binder_linux failed"
+echo 'binder_linux' | sudo tee /etc/modules-load.d/redroid.conf >/dev/null
 
-# Persist across reboots.
-log "Persisting module load across reboots"
-echo 'options binder_linux devices=binder,hwbinder,vndbinder' | sudo tee /etc/modprobe.d/redroid.conf >/dev/null
-printf 'binder_linux\nashmem_linux\n' | sudo tee /etc/modules-load.d/redroid.conf >/dev/null
+# Mount binderfs now and persist it via fstab so it survives reboots.
+sudo mkdir -p /dev/binderfs
+if ! mountpoint -q /dev/binderfs; then
+  sudo mount -t binder binder /dev/binderfs || die "failed to mount binderfs"
+fi
+grep -q '/dev/binderfs' /etc/fstab || \
+  echo 'binder /dev/binderfs binder nosuid,nodev 0 0' | sudo tee -a /etc/fstab >/dev/null
 
 # ---------------------------------------------------------------------------
 log "Installing Node.js 20 LTS (for the manager backend + ws-scrcpy)"
@@ -56,9 +61,9 @@ fi
 echo "Node: $(node -v)  npm: $(npm -v)"
 
 # ---------------------------------------------------------------------------
-log "Verifying binder devices exist"
-ls -l /dev/binder /dev/hwbinder /dev/vndbinder 2>/dev/null || \
-  warn "binder device nodes missing — redroid will fail. Check 'dmesg | grep binder'."
+log "Verifying binderfs devices exist"
+ls -l /dev/binderfs/binder /dev/binderfs/hwbinder /dev/binderfs/vndbinder 2>/dev/null || \
+  warn "binderfs nodes missing — redroid will fail. Check 'mount | grep binder' and 'dmesg | grep binder'."
 
 log "Provisioning complete."
 cat <<'EOF'

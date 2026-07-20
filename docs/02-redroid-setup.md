@@ -13,14 +13,16 @@ persists them across reboots. **Log out/in** afterwards (or `newgrp docker`) so
 
 Verify the kernel side is healthy:
 ```bash
-ls -l /dev/binder /dev/hwbinder /dev/vndbinder   # should exist
-lsmod | grep -E 'binder|ashmem'
+mountpoint /dev/binderfs                                    # should say "is a mountpoint"
+ls -l /dev/binderfs/binder /dev/binderfs/hwbinder /dev/binderfs/vndbinder
+lsmod | grep binder
 ```
-If `/dev/binder` is missing, you're likely on a non-stock/HWE kernel without the
-legacy binder device. Fix: install the matching stock kernel + modules, or
-`sudo modprobe binder_linux devices=binder,hwbinder,vndbinder` again and check
-`dmesg | grep binder`. This is the known binderfs-only breakage — the
-`linux-modules-extra` + `modprobe devices=` route avoids it.
+Ubuntu 24.04's stock 6.8 kernel is **binderfs-only** — it does *not* create the
+legacy static `/dev/binder` nodes, so the old `modprobe binder_linux devices=…`
+trick creates nothing. `setup.sh` instead loads `binder_linux` and mounts
+binderfs at `/dev/binderfs` (persisted in `/etc/fstab`); redroid's own init wires
+up `/dev/binder` from there. If the mount is missing:
+`sudo mount -t binder binder /dev/binderfs`.
 
 ## 2. Pull redroid images (native arm64)
 ```bash
@@ -43,15 +45,19 @@ Open **http://<vm-ip>:8080** from your Mac's browser.
 Confirms the kernel/modules work before involving the webapp:
 ```bash
 docker run -itd --privileged --name smoketest \
+  -v /dev/binderfs:/dev/binderfs \
   -v ~/redroid-smoke:/data -p 5555:5555 \
-  redroid/redroid:13.0.0-latest \
+  redroid/redroid:13.0.0_64only-latest \
   androidboot.redroid_gpu_mode=guest
-sleep 25
+sleep 35
 adb connect 127.0.0.1:5555
 adb -s 127.0.0.1:5555 shell getprop sys.boot_completed   # want: 1
 docker rm -f smoketest
 ```
-`1` means Android booted. If it never reaches `1`, check `docker logs smoketest`
-and the binder notes above.
+`1` means Android booted. Note two things baked into this command (and the app):
+the **`_64only`** image (Apple Silicon has no 32-bit ARM mode, so mixed images
+reboot-loop on a BoringSSL self-test), and mounting **`/dev/binderfs`** (this
+kernel is binderfs-only). If it never reaches `1`, check `docker logs smoketest`
+and `sudo dmesg | grep -iE 'boringssl|vold|shutdown_command'`.
 
 ➡️ Architecture & how streaming works: [03-architecture.md](03-architecture.md).
