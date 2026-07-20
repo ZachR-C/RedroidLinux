@@ -3,7 +3,8 @@
 FROM node:20-bookworm-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git python3 make g++ android-tools-adb \
+ && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ android-tools-adb \
+ && update-ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
