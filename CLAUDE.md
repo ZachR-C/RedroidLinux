@@ -50,7 +50,17 @@ The user wants changes tested on the real VM, not just locally:
 - `ws-scrcpy/` — built from source; H.264 stream + input in the browser.
 - Both compose services use `network_mode: host` so they SHARE one host adb
   server — backend does `adb connect 127.0.0.1:<port>`, ws-scrcpy then sees it.
-- Streaming deep-link: `http://<host>:8000/#!action=stream&udid=127.0.0.1:<port>&player=broadway`.
+- **Streaming has NO stable static deep-link** in ws-scrcpy 0.9.x. The stream
+  `action=stream` needs a `ws=` websocket URL that ws-scrcpy builds at runtime
+  from the device's interfaces (the "Configure stream" step). Passing
+  `#!action=stream&udid=…&player=…` without `ws` => `Missing required
+  parameter "ws"` => white screen. So the app's "View" button loads the
+  ws-scrcpy **device-list page** (`http://<host>:8000/`); the user clicks
+  "Configure stream" on their serial → interactive view. ws-scrcpy auto-pushes
+  scrcpy-server.jar (1.19-ws7) and starts the server on tcp:8886 — confirmed in
+  its logs. Mouse/touch/keyboard control works through the player.
+- `frontend/` is bind-mounted into the backend container (`./frontend:/frontend:ro`),
+  so UI edits need only `docker compose restart backend`, not a rebuild.
 
 ## Known gaps / TODO ideas
 - No auth on the API or ws-scrcpy — keep on private network; add a
