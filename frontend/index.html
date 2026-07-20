@@ -24,6 +24,7 @@
         <label>FPS <input name="fps" type="number" value="30" /></label>
         <button type="submit" class="primary">Create</button>
       </form>
+      <p class="msg">On Apple Silicon use a <strong>64-bit only</strong> image — the “full” images have no 32-bit ARM support here and won’t boot. Images download on first use.</p>
       <p id="create-msg" class="msg"></p>
     </section>
 
@@ -35,18 +36,6 @@
       <div id="list" class="devices"></div>
     </section>
   </main>
-
-  <!-- Fullscreen stream overlay: embeds the ws-scrcpy player for manual control -->
-  <div id="viewer" class="viewer hidden">
-    <div class="viewer-bar">
-      <span id="viewer-title"></span>
-      <span id="viewer-hint" class="viewer-hint"></span>
-      <span class="spacer"></span>
-      <a id="viewer-open" target="_blank" rel="noopener" class="ghost">Open in new tab ↗</a>
-      <button id="viewer-close" class="ghost">✕ Close</button>
-    </div>
-    <iframe id="viewer-frame" allow="clipboard-read; clipboard-write"></iframe>
-  </div>
 
   <script src="app.js"></script>
 </body>

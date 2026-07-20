@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Device · ReDroid Manager</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="console-body">
+  <div class="console">
+    <aside class="sidebar">
+      <a class="back" href="/">← All devices</a>
+      <div id="dev-name" class="dev-name">…</div>
+      <div id="dev-serial" class="dev-serial"></div>
+      <div id="dev-status" class="dev-status"></div>
+
+      <div class="side-group">
+        <div class="side-label">Video player</div>
+        <div id="players" class="side-buttons"></div>
+      </div>
+
+      <div class="side-group">
+        <div class="side-label">Tools</div>
+        <div class="side-buttons">
+          <button data-tool="shell">Shell</button>
+          <button data-tool="devtools">Devtools</button>
+          <button data-tool="list-files">List files</button>
+        </div>
+      </div>
+
+      <div class="side-group">
+        <div class="side-label">Stream</div>
+        <div class="side-buttons">
+          <button id="reload-stream">↻ Reload view</button>
+          <a id="open-tab" target="_blank" rel="noopener"><button>Open in new tab ↗</button></a>
+        </div>
+        <p class="side-hint">Use the ⚙ toolbar inside the view to toggle fit-to-screen, bitrate and resolution.</p>
+      </div>
+
+      <div id="side-msg" class="side-msg"></div>
+    </aside>
+
+    <main class="stage">
+      <iframe id="stream-frame" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    </main>
+  </div>
+  <script src="device.js"></script>
+</body>
+</html>

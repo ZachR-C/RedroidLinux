@@ -50,11 +50,25 @@ button.ghost { background: transparent; }
 .badge.idle { background: rgba(147,161,176,.15); color: var(--muted); }
 .badge.warn { background: rgba(217,154,43,.18); color: #f0c674; }
 .msg { color: var(--muted); font-size: 13px; }
-/* Fullscreen stream viewer */
-.viewer { position: fixed; inset: 0; background: #05070a; display: flex; flex-direction: column; z-index: 50; }
-.viewer.hidden { display: none; }
-.viewer-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
-.viewer-bar .spacer { flex: 1; }
-.viewer-hint { color: var(--muted); font-size: 12px; margin-left: 12px; }
-.viewer-bar a { color: var(--accent); text-decoration: none; }
-.viewer iframe { flex: 1; border: 0; width: 100%; background: #000; }
+/* ---- Device console page ---- */
+.console-body { margin: 0; height: 100vh; overflow: hidden; }
+.console { display: flex; height: 100vh; }
+.sidebar {
+  width: 240px; flex: 0 0 240px; background: var(--panel);
+  border-right: 1px solid var(--line); padding: 16px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sidebar .back { color: var(--accent); text-decoration: none; font-size: 13px; }
+.dev-name { font-size: 18px; font-weight: 600; }
+.dev-serial { color: var(--muted); font-size: 12px; font-family: monospace; margin-top: -8px; }
+.dev-status { margin-top: -4px; }
+.side-group { border-top: 1px solid var(--line); padding-top: 12px; }
+.side-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 8px; }
+.side-buttons { display: flex; flex-direction: column; gap: 6px; }
+.side-buttons button { width: 100%; text-align: left; }
+.side-buttons a { text-decoration: none; }
+.side-hint { font-size: 11px; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+.side-msg { color: var(--warn); font-size: 12px; margin-top: auto; }
+.side-msg a { color: var(--accent); }
+.stage { flex: 1; background: #05070a; min-width: 0; }
+.stage iframe { width: 100%; height: 100%; border: 0; background: #000; }

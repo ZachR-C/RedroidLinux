@@ -8,19 +8,11 @@ const api = (p, opts) => fetch(p, opts).then(async (r) => {
 
 let cfg = { images: [], wsScrcpyUrl: '', wsScrcpyPort: 8000 };
 
-// Base URL of the ws-scrcpy web UI (device-list page). ws-scrcpy builds the
-// live-stream websocket URL itself at runtime from the device's interfaces
-// (there is no stable static deep-link), so we load its device list and the
-// user clicks "Configure stream" on their device to open the interactive view.
-function wsScrcpyBase() {
-  return cfg.wsScrcpyUrl ||
-    `${location.protocol}//${location.hostname}:${cfg.wsScrcpyPort}`;
-}
-
 async function loadConfig() {
   cfg = await api('/api/config');
   const sel = $('#image-select');
-  sel.innerHTML = cfg.images.map((i) => `<option value="${i}">${i}</option>`).join('');
+  sel.innerHTML = cfg.images
+    .map((i) => `<option value="${i.image}">${i.label}</option>`).join('');
 }
 
 function badge(status) {
@@ -97,27 +89,15 @@ $('#list').addEventListener('click', async (e) => {
       const alsoData = confirm('Erase the saved /data volume too? OK = wipe, Cancel = keep files.');
       await api(`/api/instances/${id}?data=${alsoData}`, { method: 'DELETE' });
     } else if (act === 'view') {
-      const d = await api(`/api/instances/${id}`);
-      openViewer(d);
+      // Go straight to the dedicated console page (auto-streams + sidebar tools).
+      window.location.href = `/device.html?id=${encodeURIComponent(id)}`;
+      return;
     }
     await refresh();
   } catch (err) { alert('Error: ' + err.message); }
   finally { btn.disabled = false; }
 });
 
-function openViewer(d) {
-  const url = wsScrcpyBase() + '/';
-  $('#viewer-title').textContent = `${d.name} — ${d.serial}`;
-  $('#viewer-hint').textContent =
-    `Find "${d.serial}" below → click "Configure stream" → Start. You can then control the phone with your mouse.`;
-  $('#viewer-open').href = url;
-  $('#viewer-frame').src = url;
-  $('#viewer').classList.remove('hidden');
-}
-$('#viewer-close').addEventListener('click', () => {
-  $('#viewer').classList.add('hidden');
-  $('#viewer-frame').src = 'about:blank';
-});
 $('#refresh').addEventListener('click', refresh);
 
 // ---- boot -----------------------------------------------------------------

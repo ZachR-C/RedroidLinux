@@ -5,6 +5,14 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 
+// REDROID_IMAGES env override: comma-separated image tags. Labels are derived
+// from the tag. Returns null when unset so the built-in list is used.
+function parseImages(env) {
+  if (!env) return null;
+  return env.split(',').map((s) => s.trim()).filter(Boolean)
+    .map((image) => ({ label: image, image }));
+}
+
 export const config = {
   // HTTP port the manager API + UI listen on.
   port: parseInt(process.env.PORT || '8080', 10),
@@ -29,13 +37,27 @@ export const config = {
   wsScrcpyUrl: process.env.WS_SCRCPY_URL || '',
   wsScrcpyPort: parseInt(process.env.WS_SCRCPY_PORT || '8000', 10),
 
-  // Docker image allow-list offered in the "create instance" dialog.
-  // Use the _64only variants: Apple Silicon (and other pure-ARMv8 hosts) has no
-  // 32-bit ARM execution mode, so the mixed 32/64 images crash their 32-bit
-  // BoringSSL self-test and reboot-loop. 64-bit-only images avoid that entirely.
-  images: (process.env.REDROID_IMAGES ||
-    'redroid/redroid:13.0.0_64only-latest,redroid/redroid:12.0.0_64only-latest'
-  ).split(',').map((s) => s.trim()).filter(Boolean),
+  // Android images offered in the "create instance" dialog, as {label, image}.
+  // On Apple Silicon (and other pure-ARMv8 hosts) prefer the _64only variants:
+  // there is no 32-bit ARM execution mode, so the mixed 32/64 images crash their
+  // 32-bit BoringSSL self-test and reboot-loop. The full images are listed too
+  // (they work on hosts that DO have AArch32) but are flagged.
+  // Images are pulled on demand when a device is first created, so listing many
+  // here does not consume disk until used.
+  images: parseImages(process.env.REDROID_IMAGES) || [
+    { label: 'Android 16 · 64-bit only (recommended)', image: 'redroid/redroid:16.0.0_64only-latest' },
+    { label: 'Android 15 · 64-bit only (recommended)', image: 'redroid/redroid:15.0.0_64only-latest' },
+    { label: 'Android 14 · 64-bit only (recommended)', image: 'redroid/redroid:14.0.0_64only-latest' },
+    { label: 'Android 13 · 64-bit only (recommended)', image: 'redroid/redroid:13.0.0_64only-latest' },
+    { label: 'Android 12 · 64-bit only (recommended)', image: 'redroid/redroid:12.0.0_64only-latest' },
+    { label: 'Android 16 (full — needs 32-bit ARM host)', image: 'redroid/redroid:16.0.0-latest' },
+    { label: 'Android 15 (full — needs 32-bit ARM host)', image: 'redroid/redroid:15.0.0-latest' },
+    { label: 'Android 14 (full — needs 32-bit ARM host)', image: 'redroid/redroid:14.0.0-latest' },
+    { label: 'Android 13 (full — needs 32-bit ARM host)', image: 'redroid/redroid:13.0.0-latest' },
+    { label: 'Android 12 (full — needs 32-bit ARM host)', image: 'redroid/redroid:12.0.0-latest' },
+    { label: 'Android 11 (full — needs 32-bit ARM host)', image: 'redroid/redroid:11.0.0-latest' },
+    { label: 'Android 10 (full — needs 32-bit ARM host)', image: 'redroid/redroid:10.0.0-latest' },
+  ],
 
   containerPrefix: 'redroid_',
 };

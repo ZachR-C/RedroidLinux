@@ -47,11 +47,15 @@ export async function get(id) {
 }
 
 export async function create({ name, image, width, height, dpi, fps }) {
-  if (!config.images.includes(image)) throw httpErr(400, `Image not allowed: ${image}`);
+  if (!config.images.some((i) => i.image === image)) throw httpErr(400, `Image not allowed: ${image}`);
   const id = crypto.randomBytes(4).toString('hex');
   const adbPort = allocatePort();
   const dataPath = path.join(config.dataRoot, id);
   fs.mkdirSync(dataPath, { recursive: true });
+
+  // Pull the image on demand (arm64) if it's not present locally. Lets us offer
+  // many Android versions without pre-downloading them all.
+  await ensureImage(image);
 
   const rec = {
     id,
@@ -139,6 +143,19 @@ function swallowAlready(_msg) {
     if (err.statusCode === 304) return; // Docker: not modified (already in state)
     throw err;
   };
+}
+
+// Pull `image` (linux/arm64) if not already present. Resolves when the pull
+// completes. First-time pulls of a new Android version take a while (~1-2 min).
+async function ensureImage(image) {
+  try {
+    await docker.getImage(image).inspect();
+    return; // already present
+  } catch { /* not present — pull it */ }
+  const stream = await docker.pull(image, { platform: 'linux/arm64' });
+  await new Promise((resolve, reject) => {
+    docker.modem.followProgress(stream, (err) => (err ? reject(err) : resolve()));
+  });
 }
 
 export function availableImages() {
