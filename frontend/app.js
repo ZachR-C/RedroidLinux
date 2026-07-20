@@ -8,11 +8,13 @@ const api = (p, opts) => fetch(p, opts).then(async (r) => {
 
 let cfg = { images: [], wsScrcpyUrl: '', wsScrcpyPort: 8000 };
 
-// Build the ws-scrcpy deep link for a device serial (in-browser manual control).
-function streamUrl(serial) {
-  const base = cfg.wsScrcpyUrl ||
+// Base URL of the ws-scrcpy web UI (device-list page). ws-scrcpy builds the
+// live-stream websocket URL itself at runtime from the device's interfaces
+// (there is no stable static deep-link), so we load its device list and the
+// user clicks "Configure stream" on their device to open the interactive view.
+function wsScrcpyBase() {
+  return cfg.wsScrcpyUrl ||
     `${location.protocol}//${location.hostname}:${cfg.wsScrcpyPort}`;
-  return `${base}/#!action=stream&udid=${encodeURIComponent(serial)}&player=broadway`;
 }
 
 async function loadConfig() {
@@ -104,8 +106,10 @@ $('#list').addEventListener('click', async (e) => {
 });
 
 function openViewer(d) {
-  const url = streamUrl(d.serial);
+  const url = wsScrcpyBase() + '/';
   $('#viewer-title').textContent = `${d.name} — ${d.serial}`;
+  $('#viewer-hint').textContent =
+    `Find "${d.serial}" below → click "Configure stream" → Start. You can then control the phone with your mouse.`;
   $('#viewer-open').href = url;
   $('#viewer-frame').src = url;
   $('#viewer').classList.remove('hidden');

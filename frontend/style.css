@@ -55,5 +55,6 @@ button.ghost { background: transparent; }
 .viewer.hidden { display: none; }
 .viewer-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
 .viewer-bar .spacer { flex: 1; }
+.viewer-hint { color: var(--muted); font-size: 12px; margin-left: 12px; }
 .viewer-bar a { color: var(--accent); text-decoration: none; }
 .viewer iframe { flex: 1; border: 0; width: 100%; background: #000; }

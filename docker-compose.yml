@@ -22,6 +22,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock   # orchestrate redroid containers
       - /var/lib/redroid-manager:/var/lib/redroid-manager
+      # Serve the UI live from the repo so frontend edits only need a restart,
+      # not an image rebuild. (server.js serves from /frontend.)
+      - ./frontend:/frontend:ro
 
   ws-scrcpy:
     build: ./ws-scrcpy
