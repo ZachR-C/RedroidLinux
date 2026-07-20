@@ -1,0 +1,16 @@
+{
+  "name": "redroid-manager-backend",
+  "version": "1.0.0",
+  "description": "Orchestration API for redroid Android instances (create/start/stop/delete + streaming links)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "dockerode": "^4.0.2",
+    "express": "^4.19.2"
+  }
+}

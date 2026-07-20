@@ -1,0 +1,30 @@
+# Runs the manager backend + ws-scrcpy streaming server on the Ubuntu VM.
+# Both use host networking on purpose: they then share ONE adb server with each
+# other and can reach every redroid container's published 127.0.0.1:<port> ADB.
+#
+#   docker compose up -d --build
+#   open http://<vm-ip>:8080
+#
+services:
+  backend:
+    build:
+      context: .                # repo root: image needs both backend/ and frontend/
+      dockerfile: backend/Dockerfile
+    image: redroid-manager-backend
+    network_mode: host          # Linux only (the VM) — reaches 127.0.0.1:<adbPort>
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      WS_SCRCPY_PORT: "8000"
+      # Store redroid /data volumes on the host so they survive container churn.
+      REDROID_DATA_ROOT: /var/lib/redroid-manager/volumes
+      STORE_FILE: /var/lib/redroid-manager/instances.json
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # orchestrate redroid containers
+      - /var/lib/redroid-manager:/var/lib/redroid-manager
+
+  ws-scrcpy:
+    build: ./ws-scrcpy
+    image: redroid-ws-scrcpy
+    network_mode: host          # serves on :8000, shares adb server with backend
+    restart: unless-stopped

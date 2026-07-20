@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReDroid Manager</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🤖 ReDroid Manager</h1>
+    <div class="sub">Virtualized Android instances · create · run · stream</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>New device</h2>
+      <form id="create-form" class="grid">
+        <label>Name <input name="name" placeholder="device-1" /></label>
+        <label>Image <select name="image" id="image-select"></select></label>
+        <label>Width <input name="width" type="number" value="720" /></label>
+        <label>Height <input name="height" type="number" value="1280" /></label>
+        <label>DPI <input name="dpi" type="number" value="320" /></label>
+        <label>FPS <input name="fps" type="number" value="30" /></label>
+        <button type="submit" class="primary">Create</button>
+      </form>
+      <p id="create-msg" class="msg"></p>
+    </section>
+
+    <section class="panel">
+      <div class="row-between">
+        <h2>Devices</h2>
+        <button id="refresh" class="ghost">↻ Refresh</button>
+      </div>
+      <div id="list" class="devices"></div>
+    </section>
+  </main>
+
+  <!-- Fullscreen stream overlay: embeds the ws-scrcpy player for manual control -->
+  <div id="viewer" class="viewer hidden">
+    <div class="viewer-bar">
+      <span id="viewer-title"></span>
+      <span class="spacer"></span>
+      <a id="viewer-open" target="_blank" rel="noopener" class="ghost">Open in new tab ↗</a>
+      <button id="viewer-close" class="ghost">✕ Close</button>
+    </div>
+    <iframe id="viewer-frame" allow="clipboard-read; clipboard-write"></iframe>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
