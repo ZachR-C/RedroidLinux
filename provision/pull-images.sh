@@ -10,7 +10,6 @@ set -euo pipefail
 IMAGES=(
   "redroid/redroid:13.0.0_64only-latest"
   "redroid/redroid:12.0.0_64only-latest"
-  "redroid/redroid:11.0.0_64only-latest"
 )
 
 for img in "${IMAGES[@]}"; do

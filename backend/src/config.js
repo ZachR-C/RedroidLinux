@@ -34,7 +34,7 @@ export const config = {
   // 32-bit ARM execution mode, so the mixed 32/64 images crash their 32-bit
   // BoringSSL self-test and reboot-loop. 64-bit-only images avoid that entirely.
   images: (process.env.REDROID_IMAGES ||
-    'redroid/redroid:13.0.0_64only-latest,redroid/redroid:12.0.0_64only-latest,redroid/redroid:11.0.0_64only-latest'
+    'redroid/redroid:13.0.0_64only-latest,redroid/redroid:12.0.0_64only-latest'
   ).split(',').map((s) => s.trim()).filter(Boolean),
 
   containerPrefix: 'redroid_',
