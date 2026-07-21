@@ -36,8 +36,6 @@ app.post('/api/instances/:id/start', wrap(async (req, res) => res.json(await ins
 app.post('/api/instances/:id/stop', wrap(async (req, res) => res.json(await instances.stop(req.params.id))));
 app.post('/api/instances/:id/root', wrap(async (req, res) => res.status(202).json(await instances.root(req.params.id))));
 app.get('/api/instances/:id/remote', wrap(async (req, res) => res.json(await instances.remoteInfo(req.params.id))));
-app.post('/api/instances/:id/expose', wrap(async (req, res) =>
-  res.json(await instances.setExposed(req.params.id, !!(req.body && req.body.exposed)))));
 
 // APK install: the client POSTs the raw .apk bytes as the request body. We
 // stream them to a temp file (no full buffering) then `adb install`. Kept off

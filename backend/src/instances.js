@@ -65,11 +65,9 @@ function containerSpec(rec) {
       // Ubuntu 24.04 / 6.8) and let redroid's own init wire up /dev/binder from
       // it. Mapping individual nodes causes an early-boot race that aborts vold.
       Binds: [`${rec.dataPath}:/data`, '/dev/binderfs:/dev/binderfs'],
-      // Bind ADB to localhost by default (secure; reach it via SSH tunnel). When
-      // `exposed`, bind to 0.0.0.0 so remote machines can adb-connect directly.
-      PortBindings: {
-        '5555/tcp': [{ HostIp: rec.exposed ? '0.0.0.0' : '127.0.0.1', HostPort: String(rec.adbPort) }],
-      },
+      // ADB stays bound to localhost on the server; remote machines reach it
+      // securely by SSH-tunnelling the host's adb server (see remoteInfo).
+      PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(rec.adbPort) }] },
       RestartPolicy: { Name: 'no' },
     },
     ExposedPorts: { '5555/tcp': {} },
@@ -166,27 +164,22 @@ function primaryHost() {
   return 'localhost';
 }
 
-// Connection info for reaching this device's ADB from another computer.
+// Connection info for reaching this device's ADB from another computer. Remote
+// machines tunnel the server's adb SERVER (5037) over SSH and talk to it as a
+// client — this shares the one adb server on the host (which ws-scrcpy also
+// uses) instead of fighting over the device's single adbd transport.
 export async function remoteInfo(id) {
   const rec = mustGet(id);
   const host = config.publicHost || primaryHost();
   return {
     adbPort: rec.adbPort,
-    exposed: !!rec.exposed,
+    serial: adb.serialFor(rec.adbPort), // as seen on the server, e.g. 127.0.0.1:5558
     host,
     sshUser: config.sshUser,
     sshPort: config.sshPort,
+    adbServerPort: 5037,
     autodetectedHost: primaryHost(),
   };
-}
-
-// Toggle whether ADB is published on 0.0.0.0 (reachable from the network) vs
-// 127.0.0.1 (localhost only). Recreates the container, so the device reboots.
-export async function setExposed(id, exposed) {
-  const rec = mustGet(id);
-  if (!!rec.exposed === !!exposed) return get(id);
-  await recreate({ ...rec, exposed: !!exposed });
-  return get(id);
 }
 
 // Install an APK (already saved to filePath) onto a running device via adb.

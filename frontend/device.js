@@ -146,20 +146,21 @@ $('#reload-stream').addEventListener('click', loadStream);
 
 // ---- Remote ADB modal ----
 let remote = null;
+const LOCAL_ADB_PORT = 15037; // local tunnel port; avoids clashing with a local adb server (5037)
 function renderRemoteCmds() {
   if (!remote) return;
   const host = $('#rm-host').value.trim() || remote.host;
   const user = $('#rm-user').value.trim() || 'USER';
   const sshPort = $('#rm-sshport').value.trim() || '22';
-  const p = remote.adbPort;
-  // Suggest the same local port number for convenience.
+  const lp = LOCAL_ADB_PORT;
+  const serial = remote.serial;
   $('#rm-tunnel').textContent =
-    `ssh -N -L ${p}:127.0.0.1:${p} ${user}@${host} -p ${sshPort}\n` +
-    `# then, in another terminal on the same computer:\n` +
-    `adb connect 127.0.0.1:${p}\n` +
-    `adb -s 127.0.0.1:${p} shell getprop ro.build.version.release`;
-  $('#rm-direct').textContent =
-    `adb connect ${host}:${p}` + (remote.exposed ? '' : '   # enable "Expose ADB" first');
+    `ssh -N -L ${lp}:127.0.0.1:${remote.adbServerPort} ${user}@${host} -p ${sshPort}`;
+  $('#rm-use').textContent =
+    `export ANDROID_ADB_SERVER_PORT=${lp}\n` +
+    `adb devices                       # lists ${serial}\n` +
+    `adb -s ${serial} shell getprop ro.build.version.release\n` +
+    `adb -s ${serial} install app.apk  # e.g. Claude Code testing your app`;
 }
 async function openRemote() {
   remote = await api(`/api/instances/${id}/remote`);
@@ -167,7 +168,6 @@ async function openRemote() {
   $('#rm-host').value = remote.host || remote.autodetectedHost || '';
   $('#rm-user').value = remote.sshUser || '';
   $('#rm-sshport').value = remote.sshPort || 22;
-  $('#rm-expose').checked = !!remote.exposed;
   renderRemoteCmds();
   $('#remote-modal').classList.remove('hidden');
 }
@@ -175,26 +175,6 @@ $('#remote-btn').addEventListener('click', openRemote);
 $('#rm-close').addEventListener('click', () => $('#remote-modal').classList.add('hidden'));
 ['rm-host', 'rm-user', 'rm-sshport'].forEach((el) =>
   $('#' + el).addEventListener('input', renderRemoteCmds));
-$('#rm-expose').addEventListener('change', async (e) => {
-  const on = e.target.checked;
-  $('#rm-msg').textContent = on
-    ? '⏳ Exposing ADB and rebooting the device…'
-    : '⏳ Making ADB private again and rebooting…';
-  try {
-    const d = await api(`/api/instances/${id}/expose`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exposed: on }),
-    });
-    remote.exposed = d.exposed;
-    $('#rm-msg').textContent = d.exposed
-      ? '✅ ADB is now reachable on the network. Make sure only trusted machines/VPN can reach this port.'
-      : '✅ ADB is private again (localhost only).';
-    renderRemoteCmds();
-  } catch (err) {
-    e.target.checked = !on;
-    $('#rm-msg').textContent = 'Error: ' + (err.message || err);
-  }
-});
 document.querySelectorAll('.copy-btn').forEach((b) =>
   b.addEventListener('click', () => {
     navigator.clipboard.writeText($('#' + b.dataset.copy).textContent).then(() => {

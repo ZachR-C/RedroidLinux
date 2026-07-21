@@ -98,17 +98,17 @@
         <label>SSH port <input id="rm-sshport" type="number" value="22" /></label>
       </div>
 
-      <h4>Recommended — secure SSH tunnel <span class="tag">works anywhere the server is SSH-reachable</span></h4>
-      <p class="modal-sub">Run this on the other computer (needs <code>adb</code> + SSH access to the server). Keeps ADB private; nothing is exposed to the network.</p>
+      <h4>Step 1 — open an SSH tunnel to the emulator's ADB server <span class="tag">keep it running</span></h4>
+      <p class="modal-sub">On the other computer (needs <code>adb</code> + SSH access to the server). Secure — ADB never leaves the server; works on a VPS or through NAT.</p>
       <pre id="rm-tunnel" class="cmd"></pre>
-      <button class="copy-btn" data-copy="rm-tunnel">Copy tunnel commands</button>
+      <button class="copy-btn" data-copy="rm-tunnel">Copy</button>
 
-      <h4>Direct connection <span class="tag warn-tag">unauthenticated — trusted networks / VPN only</span></h4>
-      <label class="side-check"><input type="checkbox" id="rm-expose" /> Expose ADB on the network (reboots the device)</label>
-      <p class="modal-sub">When exposed and the port is reachable (e.g. a VPS with the firewall opened), connect directly:</p>
-      <pre id="rm-direct" class="cmd"></pre>
-      <button class="copy-btn" data-copy="rm-direct">Copy direct command</button>
+      <h4>Step 2 — point adb at it &amp; drive the device</h4>
+      <p class="modal-sub">In another terminal. Any adb tool (Claude Code, Android Studio, scripts) that inherits this env now controls the emulator.</p>
+      <pre id="rm-use" class="cmd"></pre>
+      <button class="copy-btn" data-copy="rm-use">Copy</button>
 
+      <p class="modal-sub" style="margin-top:14px">One tunnel exposes <em>every</em> emulator on this server — use the serial above to pick this one. On a VPS, set <code>PUBLIC_HOST</code>/<code>SSH_USER</code> in <code>.env</code> to prefill these.</p>
       <p id="rm-msg" class="modal-sub"></p>
     </div>
   </div>
