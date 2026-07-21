@@ -65,6 +65,8 @@ docs/              01 VM setup · 02 redroid setup · 03 architecture
 | POST | `/api/instances/:id/start` | start + `adb connect` |
 | POST | `/api/instances/:id/stop` | `adb disconnect` + stop |
 | DELETE | `/api/instances/:id?data=true` | remove container (`data=true` wipes `/data`) |
+| POST | `/api/instances/:id/root` | build a Magisk image & recreate the device rooted (poll `rootState`) |
+| POST | `/api/instances/:id/install` | install an APK — raw `.apk` bytes as the request body |
 
 ## ⚠️ Security note (read before exposing it)
 There is **no authentication** and the backend has full Docker socket access.

@@ -82,9 +82,15 @@ The user wants changes tested on the real VM, not just locally:
 - Backend then recreates the device container on the `_magisk` image (same
   `/data`, port, geometry), starts it, sets `rootState=rooted`, and best-effort
   installs the Magisk manager apk (`ensureMagiskApp`) once booted.
-- Uses ayasa520's Magisk fork **v30.7** (bootless; Zygisk/LSPosed capable).
-  Verified on Android 13 `_64only`: `su 0 id` → uid=0(root), `magiskd` running,
-  Magisk 30.6, manager app `com.topjohnwu.magisk` installs.
+- **Magisk pinned to v30.6** via `rooter/Dockerfile` ARG `REDROID_SCRIPT_REF`
+  (redroid-script commit 881f7f0). The later v30.7 bump changed the manager APK
+  signature, which trips magiskd's anti-tamper check under redroid (`APK
+  signature mismatch` → `pm_uninstall`), so the app crashed + self-deleted on
+  first launch (upstream issues #74/#76). v30.6 (`30.6:MAGISK:D`) matches, app
+  is stable. If you ever bump the ref, re-verify the app survives launch.
+- Verified on Android 13 `_64only`: `su 0 id` → uid=0(root), `magiskd` running,
+  manager app `com.topjohnwu.magisk` (v30.6) launches, survives, and spawns a
+  `:root:0` subprocess (i.e. Magisk grants it root — Zygisk/LSPosed will work).
 - The rooter needs internet (downloads Magisk from GitHub) and the docker socket.
   Rebuild it after changing `rooter/`: `docker compose --profile rooter build rooter`.
 
