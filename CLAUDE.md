@@ -70,6 +70,24 @@ The user wants changes tested on the real VM, not just locally:
 - `frontend/` is bind-mounted into the backend container (`./frontend:/frontend:ro`),
   so UI edits need only `docker compose restart backend`, not a rebuild.
 
+## One-click root (Magisk) — verified working
+- `POST /api/instances/:id/root` → backend sets `rootState=rooting`, launches the
+  one-shot **`redroid-rooter`** image (built from `rooter/`, under compose profile
+  `rooter`; the backend starts it via the Docker API with the docker.sock
+  mounted), which runs `rooter/root-device.py`. That reuses
+  ayasa520/redroid-script's Magisk file-prep and builds `FROM <device image> ;
+  COPY magisk /` → `<repo>:<tag>_magisk`. Building `FROM` the device's own image
+  ourselves is why it roots the `_64only` tags (redroid-script's own version list
+  has no `_64only` for 13/14/16).
+- Backend then recreates the device container on the `_magisk` image (same
+  `/data`, port, geometry), starts it, sets `rootState=rooted`, and best-effort
+  installs the Magisk manager apk (`ensureMagiskApp`) once booted.
+- Uses ayasa520's Magisk fork **v30.7** (bootless; Zygisk/LSPosed capable).
+  Verified on Android 13 `_64only`: `su 0 id` → uid=0(root), `magiskd` running,
+  Magisk 30.6, manager app `com.topjohnwu.magisk` installs.
+- The rooter needs internet (downloads Magisk from GitHub) and the docker socket.
+  Rebuild it after changing `rooter/`: `docker compose --profile rooter build rooter`.
+
 ## Known gaps / TODO ideas
 - No auth on the API or ws-scrcpy — keep on private network; add a
   reverse proxy + auth before any VPS exposure.

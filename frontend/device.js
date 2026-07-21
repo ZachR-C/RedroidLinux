@@ -95,7 +95,7 @@ async function pollRoot() {
   device = d;
   const s = $('#root-status');
   if (d.rootState === 'rooted') {
-    s.innerHTML = '✅ Rooted (Magisk). Open the Magisk app on the device to finish, then install LSPosed etc.';
+    s.innerHTML = '✅ Rooted (Magisk). su works now; the Magisk app installs itself a few seconds after boot — open it to enable Zygisk, then install LSPosed/Vector.';
     $('#root-btn').disabled = false;
     $('#root-btn').textContent = '⚡ Re-root (Magisk)';
     rooting = false;

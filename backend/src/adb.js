@@ -32,3 +32,18 @@ export async function isOnline(adbPort) {
   const line = out.split('\n').find((l) => l.startsWith(serialFor(adbPort)));
   return !!line && /\bdevice\b/.test(line);
 }
+
+export async function shell(adbPort, command) {
+  return adb(['-s', serialFor(adbPort), 'shell', command]);
+}
+
+// Wait until Android reports sys.boot_completed=1 (or time out). Returns bool.
+export async function waitBooted(adbPort, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const out = (await shell(adbPort, 'getprop sys.boot_completed')).trim();
+    if (out === '1') return true;
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+  return false;
+}

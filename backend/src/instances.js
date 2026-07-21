@@ -177,6 +177,15 @@ async function doRoot(rec) {
   await adb.connect(rooted.adbPort);
   store.put(rooted);
   console.log(`[root] ${rec.id} rooted on ${outImage}`);
+
+  // Best-effort: once booted, make sure the Magisk manager app is installed so
+  // the user can enable Zygisk / install LSPosed. Non-blocking; su already works.
+  ensureMagiskApp(rooted.adbPort).catch((e) => console.warn('[root] magisk app:', e.message));
+}
+
+async function ensureMagiskApp(adbPort) {
+  if (!(await adb.waitBooted(adbPort))) return;
+  await adb.shell(adbPort, 'su 0 pm install -r /system/etc/init/magisk/magisk.apk');
 }
 
 // Launch the rooter image as a one-off container and wait for it to finish.
