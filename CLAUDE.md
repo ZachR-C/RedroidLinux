@@ -115,6 +115,19 @@ The user wants changes tested on the real VM, not just locally:
 - Config `PUBLIC_HOST` / `SSH_USER` / `SSH_PORT` prefill the UI (host auto-detects
   via host-network interfaces). Requires matching-ish adb versions on both ends.
 
+## Storage model (kept lean)
+- **On-demand images**: `install.sh` pulls NO Android images; `ensureImage()`
+  pulls each version the first time a device uses it. A fresh install/VPS carries
+  no multi-GB images until needed. `provision/pull-images.sh` is optional warm-up.
+- **Per-instance cost is small**: base image (~2 GB) is a shared read-only layer
+  across every device on that version; each `/data` volume is ~25–250 MB.
+- **Root images**: one stable `<base>_magisk` tag per version (root builds FROM
+  the tracked `baseImage`, never FROM a rooted image — avoids `_magisk_magisk`).
+  Re-root replaces the tag; the old image + danglers are auto-pruned. Deleting a
+  device reclaims its `_magisk` image if unreferenced. Base `-latest` images are
+  left for re-pull on demand.
+- Measured density: ~0.7 GB RAM per running idle instance (Android 14, 720p).
+
 ## Known gaps / TODO ideas
 - No auth on the API or ws-scrcpy — keep on private network; add a
   reverse proxy + auth before any VPS exposure.
