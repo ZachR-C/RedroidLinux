@@ -32,7 +32,10 @@ log "Running host provisioning (Docker, binder/ashmem, adb, Node)"
 chmod +x provision/*.sh
 ./provision/setup.sh
 
-REST_CMD="cd '$INSTALL_DIR' && ./provision/pull-images.sh && docker compose up -d --build && docker compose --profile rooter build rooter"
+# Note: we do NOT pre-pull Android images here — the backend pulls each version
+# on demand the first time you create a device with it. That keeps a fresh
+# install (and a VPS) lean: no multi-GB images sit on disk until actually used.
+REST_CMD="cd '$INSTALL_DIR' && docker compose up -d --build && docker compose --profile rooter build rooter"
 
 # A freshly-added docker group membership only applies to new shells/logins.
 # `sg docker` runs the rest of the install with that group active right now,

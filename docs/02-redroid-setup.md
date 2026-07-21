@@ -24,9 +24,12 @@ binderfs at `/dev/binderfs` (persisted in `/etc/fstab`); redroid's own init wire
 up `/dev/binder` from there. If the mount is missing:
 `sudo mount -t binder binder /dev/binderfs`.
 
-## 2. Pull redroid images (native arm64)
+## 2. (Optional) Pre-pull redroid images
+Images are **pulled on demand** the first time you create a device with a given
+Android version, so you can skip this. Pre-pull only if you want the first
+device to start faster:
 ```bash
-./provision/pull-images.sh
+./provision/pull-images.sh   # optional; on-demand pulling is the default
 ```
 
 ## 3. Start the stack

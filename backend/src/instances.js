@@ -99,6 +99,7 @@ export async function create({ name, image, width, height, dpi, fps }) {
     id,
     name: (name || `device-${id}`).trim(),
     image,
+    baseImage: image, // the un-rooted image; root always builds FROM this
     adbPort,
     dataPath,
     width: width || 720,
@@ -137,6 +138,12 @@ export async function remove(id, { deleteData = false } = {}) {
   } catch { /* container may already be gone */ }
   if (deleteData) fs.rmSync(rec.dataPath, { recursive: true, force: true });
   store.delete(id);
+  // Reclaim this device's per-device rooted (_magisk) image if nothing else uses
+  // it. Base (-latest) images are left alone — they're shared and re-pulled on
+  // demand anyway.
+  if (/_magisk$/.test(rec.image || '') && !store.all().some((r) => r.image === rec.image)) {
+    try { await docker.getImage(rec.image).remove(); } catch {}
+  }
   return { id, deletedData: deleteData };
 }
 
@@ -220,12 +227,26 @@ export async function pushFile(id, filePath, filename) {
   return { ok: true, remotePath, output: out.trim() };
 }
 
-// Derive the Magisk image tag from a base image: repo:tag -> repo:tag_magisk.
-function rootedTag(image) {
+// Recover the un-rooted base tag from any image (handles legacy _magisk images
+// that predate baseImage tracking): repo:13.0.0_64only_magisk -> repo:13.0.0_64only-latest.
+function deriveBase(image) {
   const i = image.lastIndexOf(':');
   const repo = image.slice(0, i);
-  const tag = image.slice(i + 1).replace(/-latest$/, '');
+  const tag = image.slice(i + 1).replace(/(_magisk)+$/, '').replace(/-latest$/, '');
+  return `${repo}:${tag}-latest`;
+}
+
+// Magisk image tag for a base: repo:13.0.0_64only-latest -> repo:13.0.0_64only_magisk.
+function rootedTag(baseImage) {
+  const i = baseImage.lastIndexOf(':');
+  const repo = baseImage.slice(0, i);
+  const tag = baseImage.slice(i + 1).replace(/-latest$/, '');
   return `${repo}:${tag}_magisk`;
+}
+
+// Remove dangling (untagged) images left behind by rebuilds. Best-effort.
+async function pruneDangling() {
+  try { await docker.pruneImages({ filters: { dangling: ['true'] } }); } catch {}
 }
 
 // One-click root: build a Magisk image for this device's Android version, then
@@ -246,14 +267,19 @@ export async function root(id) {
 }
 
 async function doRoot(rec) {
-  const outImage = rootedTag(rec.image);
+  // Always build FROM the un-rooted base (never FROM an already-rooted image —
+  // that double-layers Magisk and wastes a full image), and reuse a stable tag
+  // so re-rooting replaces it and the old one is pruned.
+  const base = rec.baseImage || deriveBase(rec.image);
+  const outImage = rootedTag(base);
 
   // 1) Build the Magisk image via the one-shot rooter container.
-  await runRooter(rec.image, outImage);
+  await runRooter(base, outImage);
 
   // 2) Recreate the device container on the rooted image (keep /data & port).
-  const rooted = { ...rec, image: outImage, rootState: 'rooted', rooted: true };
+  const rooted = { ...rec, baseImage: base, image: outImage, rootState: 'rooted', rooted: true };
   await recreate(rooted);
+  await pruneDangling();
   console.log(`[root] ${rec.id} rooted on ${outImage}`);
 
   // Best-effort: once booted, make sure the Magisk manager app is installed so
