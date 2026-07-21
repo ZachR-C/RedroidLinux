@@ -17,7 +17,13 @@ RUN set -eux; \
     rm -rf /tmp/d.tgz /tmp/docker
 
 WORKDIR /opt
-RUN git clone --depth 1 https://github.com/ayasa520/redroid-script.git
+# Pin to the last commit that used Magisk v30.6. The later v30.7 bump changed the
+# manager APK signature, which trips Magisk's anti-tamper check under redroid and
+# makes the app crash + self-uninstall on first launch (ayasa520/redroid-script
+# issues #74/#76). v30.6's apk + daemon signatures match, so the manager sticks.
+ARG REDROID_SCRIPT_REF=881f7f00d6a86af4f8e4947af5d587a144a1806c
+RUN git clone https://github.com/ayasa520/redroid-script.git \
+ && git -C redroid-script checkout "${REDROID_SCRIPT_REF}"
 RUN pip install --no-cache-dir -r redroid-script/requirements.txt
 
 COPY root-device.py /opt/root-device.py

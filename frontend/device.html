@@ -32,6 +32,15 @@
       </div>
 
       <div class="side-group">
+        <div class="side-label">Install APK</div>
+        <div id="apk-drop" class="apk-drop">
+          <span>Drag an .apk here<br />or click to choose</span>
+          <input type="file" id="apk-input" accept=".apk,application/vnd.android.package-archive" hidden />
+        </div>
+        <p id="apk-status" class="side-hint"></p>
+      </div>
+
+      <div class="side-group">
         <div class="side-label">Root</div>
         <div class="side-buttons">
           <button id="root-btn" class="primary">⚡ One-click root (Magisk)</button>

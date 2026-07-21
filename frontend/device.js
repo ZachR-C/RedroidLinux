@@ -144,4 +144,31 @@ $('#tool-close').addEventListener('click', () => {
 });
 $('#reload-stream').addEventListener('click', loadStream);
 
+// ---- APK install (drag & drop / click) ----
+async function installApk(file) {
+  if (!file) return;
+  if (!/\.apk$/i.test(file.name)) { $('#apk-status').textContent = 'Please choose a .apk file.'; return; }
+  const s = $('#apk-status');
+  s.textContent = `⏳ Uploading & installing ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
+  try {
+    const r = await fetch(`/api/instances/${id}/install`, { method: 'POST', body: file });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    s.textContent = `✅ Installed ${file.name}.`;
+  } catch (e) {
+    s.textContent = '❌ ' + (e.message || e);
+  }
+}
+const drop = $('#apk-drop');
+const fileInput = $('#apk-input');
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => installApk(fileInput.files[0]));
+['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.add('drag');
+}));
+['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.remove('drag');
+}));
+drop.addEventListener('drop', (e) => installApk(e.dataTransfer.files[0]));
+
 boot();

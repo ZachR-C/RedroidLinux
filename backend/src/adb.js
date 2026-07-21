@@ -7,9 +7,9 @@ import { config } from './config.js';
 
 const run = promisify(execFile);
 
-async function adb(args) {
+async function adb(args, timeout = 15000) {
   try {
-    const { stdout } = await run('adb', args, { timeout: 15000 });
+    const { stdout } = await run('adb', args, { timeout, maxBuffer: 8 * 1024 * 1024 });
     return stdout.trim();
   } catch (err) {
     // adb often exits non-zero with a useful message on stdout/stderr.
@@ -35,6 +35,11 @@ export async function isOnline(adbPort) {
 
 export async function shell(adbPort, command) {
   return adb(['-s', serialFor(adbPort), 'shell', command]);
+}
+
+export async function install(adbPort, filePath) {
+  // -r reinstall keeping data, -g grant runtime perms. Big APKs need time.
+  return adb(['-s', serialFor(adbPort), 'install', '-r', '-g', filePath], 300000);
 }
 
 // Wait until Android reports sys.boot_completed=1 (or time out). Returns bool.

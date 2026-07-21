@@ -1,6 +1,9 @@
 // REST API + static UI host for the redroid manager.
 import express from 'express';
 import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import * as instances from './instances.js';
@@ -32,6 +35,26 @@ app.post('/api/instances', wrap(async (req, res) => res.status(201).json(await i
 app.post('/api/instances/:id/start', wrap(async (req, res) => res.json(await instances.start(req.params.id))));
 app.post('/api/instances/:id/stop', wrap(async (req, res) => res.json(await instances.stop(req.params.id))));
 app.post('/api/instances/:id/root', wrap(async (req, res) => res.status(202).json(await instances.root(req.params.id))));
+
+// APK install: the client POSTs the raw .apk bytes as the request body. We
+// stream them to a temp file (no full buffering) then `adb install`. Kept off
+// express.json() by streaming req directly before any body parser runs.
+app.post('/api/instances/:id/install', (req, res) => {
+  const tmp = path.join(os.tmpdir(), `apk-${crypto.randomBytes(6).toString('hex')}.apk`);
+  const out = fs.createWriteStream(tmp);
+  const cleanup = () => fs.rm(tmp, { force: true }, () => {});
+  req.pipe(out);
+  out.on('error', (e) => { cleanup(); res.status(500).json({ error: e.message }); });
+  out.on('finish', async () => {
+    try {
+      const stat = fs.statSync(tmp);
+      if (stat.size < 100) throw new Error('Uploaded file is empty or not an APK.');
+      res.json(await instances.installApk(req.params.id, tmp));
+    } catch (e) {
+      res.status(e.status || 500).json({ error: e.message });
+    } finally { cleanup(); }
+  });
+});
 app.delete('/api/instances/:id', wrap(async (req, res) =>
   res.json(await instances.remove(req.params.id, { deleteData: req.query.data === 'true' }))));
 

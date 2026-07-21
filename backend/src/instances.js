@@ -137,6 +137,15 @@ export async function remove(id, { deleteData = false } = {}) {
   return { id, deletedData: deleteData };
 }
 
+// Install an APK (already saved to filePath) onto a running device via adb.
+export async function installApk(id, filePath) {
+  const rec = mustGet(id);
+  if (!(await adb.isOnline(rec.adbPort))) throw httpErr(409, 'Device is not online — Start it first.');
+  const out = await adb.install(rec.adbPort, filePath);
+  if (!/Success/i.test(out)) throw httpErr(422, `Install failed: ${out.trim().slice(0, 500)}`);
+  return { ok: true, output: out.trim() };
+}
+
 // Derive the Magisk image tag from a base image: repo:tag -> repo:tag_magisk.
 function rootedTag(image) {
   const i = image.lastIndexOf(':');
