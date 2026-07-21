@@ -277,8 +277,15 @@ async function doRoot(rec) {
   await runRooter(base, outImage);
 
   // 2) Recreate the device container on the rooted image (keep /data & port).
+  const oldImage = rec.image;
   const rooted = { ...rec, baseImage: base, image: outImage, rootState: 'rooted', rooted: true };
   await recreate(rooted);
+  // Reclaim the device's previous rooted image if re-rooting changed the tag and
+  // nothing else uses it (e.g. cleaning up legacy _magisk_magisk artifacts).
+  if (oldImage && oldImage !== outImage && /_magisk(_magisk)*$/.test(oldImage) &&
+      !store.all().some((r) => r.image === oldImage)) {
+    try { await docker.getImage(oldImage).remove(); } catch {}
+  }
   await pruneDangling();
   console.log(`[root] ${rec.id} rooted on ${outImage}`);
 
