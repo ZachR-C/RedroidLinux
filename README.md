@@ -67,6 +67,7 @@ docs/              01 VM setup · 02 redroid setup · 03 architecture
 | DELETE | `/api/instances/:id?data=true` | remove container (`data=true` wipes `/data`) |
 | POST | `/api/instances/:id/root` | build a Magisk image & recreate the device rooted (poll `rootState`) |
 | POST | `/api/instances/:id/install` | install an APK — raw `.apk` bytes as the request body |
+| POST | `/api/instances/:id/push?name=<file>` | upload any file — raw bytes in body; routed to Pictures/Movies/Music/Documents/Download by type |
 
 ## ⚠️ Security note (read before exposing it)
 There is **no authentication** and the backend has full Docker socket access.
