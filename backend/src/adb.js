@@ -42,6 +42,10 @@ export async function install(adbPort, filePath) {
   return adb(['-s', serialFor(adbPort), 'install', '-r', '-g', filePath], 300000);
 }
 
+export async function push(adbPort, localPath, remotePath) {
+  return adb(['-s', serialFor(adbPort), 'push', localPath, remotePath], 300000);
+}
+
 // Wait until Android reports sys.boot_completed=1 (or time out). Returns bool.
 export async function waitBooted(adbPort, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;

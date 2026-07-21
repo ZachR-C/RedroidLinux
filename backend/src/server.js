@@ -39,21 +39,32 @@ app.post('/api/instances/:id/root', wrap(async (req, res) => res.status(202).jso
 // APK install: the client POSTs the raw .apk bytes as the request body. We
 // stream them to a temp file (no full buffering) then `adb install`. Kept off
 // express.json() by streaming req directly before any body parser runs.
-app.post('/api/instances/:id/install', (req, res) => {
-  const tmp = path.join(os.tmpdir(), `apk-${crypto.randomBytes(6).toString('hex')}.apk`);
+// Stream a raw request body to a temp file, run `handler(tmpPath)`, then clean up.
+function receiveFile(req, res, ext, handler) {
+  const tmp = path.join(os.tmpdir(), `up-${crypto.randomBytes(6).toString('hex')}${ext}`);
   const out = fs.createWriteStream(tmp);
   const cleanup = () => fs.rm(tmp, { force: true }, () => {});
   req.pipe(out);
   out.on('error', (e) => { cleanup(); res.status(500).json({ error: e.message }); });
   out.on('finish', async () => {
     try {
-      const stat = fs.statSync(tmp);
-      if (stat.size < 100) throw new Error('Uploaded file is empty or not an APK.');
-      res.json(await instances.installApk(req.params.id, tmp));
+      if (fs.statSync(tmp).size < 1) throw new Error('Uploaded file is empty.');
+      res.json(await handler(tmp));
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
     } finally { cleanup(); }
   });
+}
+
+// APK install: raw .apk bytes in the request body.
+app.post('/api/instances/:id/install', (req, res) =>
+  receiveFile(req, res, '.apk', (tmp) => instances.installApk(req.params.id, tmp)));
+
+// Generic file upload: raw bytes in the body, original name in ?name=. Routed
+// to the matching on-device folder (Pictures/Movies/Music/Documents/Download).
+app.post('/api/instances/:id/push', (req, res) => {
+  const name = path.basename(String(req.query.name || 'file'));
+  receiveFile(req, res, '', (tmp) => instances.pushFile(req.params.id, tmp, name));
 });
 app.delete('/api/instances/:id', wrap(async (req, res) =>
   res.json(await instances.remove(req.params.id, { deleteData: req.query.data === 'true' }))));

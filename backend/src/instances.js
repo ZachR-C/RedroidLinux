@@ -146,6 +146,35 @@ export async function installApk(id, filePath) {
   return { ok: true, output: out.trim() };
 }
 
+// Pick the natural on-device folder for a file by extension.
+function remoteDirFor(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(ext)) return '/sdcard/Pictures';
+  if (['mp4', 'mkv', 'webm', 'mov', 'avi', '3gp', 'm4v'].includes(ext)) return '/sdcard/Movies';
+  if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(ext)) return '/sdcard/Music';
+  if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'epub'].includes(ext)) return '/sdcard/Documents';
+  return '/sdcard/Download';
+}
+
+// Push an arbitrary file to the device's shared storage, into the folder that
+// matches its type, then best-effort media-scan so it shows up in gallery/apps.
+export async function pushFile(id, filePath, filename) {
+  const rec = mustGet(id);
+  if (!(await adb.isOnline(rec.adbPort))) throw httpErr(409, 'Device is not online — Start it first.');
+  const safe = filename.replace(/[/\\]/g, '_').replace(/^\.+/, '') || 'file';
+  const dir = remoteDirFor(safe);
+  const remotePath = `${dir}/${safe}`;
+  await adb.shell(rec.adbPort, `mkdir -p '${dir}'`);
+  const out = await adb.push(rec.adbPort, filePath, remotePath);
+  if (/error:|failed to|no such/i.test(out) && !/pushed/i.test(out)) {
+    throw httpErr(422, `Upload failed: ${out.trim().slice(0, 500)}`);
+  }
+  // Make it visible to the gallery/Files app (best-effort; ignore failures).
+  await adb.shell(rec.adbPort,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${remotePath}`).catch(() => {});
+  return { ok: true, remotePath, output: out.trim() };
+}
+
 // Derive the Magisk image tag from a base image: repo:tag -> repo:tag_magisk.
 function rootedTag(image) {
   const i = image.lastIndexOf(':');

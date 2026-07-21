@@ -144,31 +144,44 @@ $('#tool-close').addEventListener('click', () => {
 });
 $('#reload-stream').addEventListener('click', loadStream);
 
-// ---- APK install (drag & drop / click) ----
-async function installApk(file) {
-  if (!file) return;
-  if (!/\.apk$/i.test(file.name)) { $('#apk-status').textContent = 'Please choose a .apk file.'; return; }
-  const s = $('#apk-status');
-  s.textContent = `⏳ Uploading & installing ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
-  try {
-    const r = await fetch(`/api/instances/${id}/install`, { method: 'POST', body: file });
-    const body = await r.json();
-    if (!r.ok) throw new Error(body.error || r.statusText);
-    s.textContent = `✅ Installed ${file.name}.`;
-  } catch (e) {
-    s.textContent = '❌ ' + (e.message || e);
-  }
+// ---- upload (drag & drop / click): .apk installs, anything else is pushed ----
+const s = () => $('#apk-status');
+const mb = (n) => (n / 1048576).toFixed(1) + ' MB';
+
+async function uploadOne(file) {
+  const isApk = /\.apk$/i.test(file.name);
+  const verb = isApk ? 'Installing' : 'Uploading';
+  s().textContent = `⏳ ${verb} ${file.name} (${mb(file.size)})…`;
+  const url = isApk
+    ? `/api/instances/${id}/install`
+    : `/api/instances/${id}/push?name=${encodeURIComponent(file.name)}`;
+  const r = await fetch(url, { method: 'POST', body: file });
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error || r.statusText);
+  return isApk ? `Installed ${file.name}` : `Uploaded ${file.name} → ${body.remotePath}`;
 }
+
+async function handleFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  const results = [];
+  for (const f of files) {
+    try { results.push('✅ ' + await uploadOne(f)); }
+    catch (e) { results.push('❌ ' + f.name + ': ' + (e.message || e)); }
+  }
+  s().innerHTML = results.join('<br>');
+}
+
 const drop = $('#apk-drop');
 const fileInput = $('#apk-input');
 drop.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => installApk(fileInput.files[0]));
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
 ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => {
   e.preventDefault(); drop.classList.add('drag');
 }));
 ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => {
   e.preventDefault(); drop.classList.remove('drag');
 }));
-drop.addEventListener('drop', (e) => installApk(e.dataTransfer.files[0]));
+drop.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
 boot();
