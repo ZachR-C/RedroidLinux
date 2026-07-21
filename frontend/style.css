@@ -88,3 +88,15 @@ button.ghost { background: transparent; }
 .tool-bar .spacer { flex: 1; }
 .tool-bar a { color: var(--accent); text-decoration: none; }
 .tool-panel iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+/* Remote ADB modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.modal.hidden { display: none; }
+.modal-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; max-width: 720px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.modal-sub { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+.modal h4 { margin: 18px 0 6px; font-size: 14px; }
+.modal .tag { font-size: 11px; font-weight: 400; color: var(--muted); background: rgba(147,161,176,.15); padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+.modal .warn-tag { color: #f0c674; background: rgba(217,154,43,.18); }
+.rm-fields { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin: 10px 0; }
+.cmd { background: #0b0e12; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; color: #cfe6ff; overflow-x: auto; }
+.copy-btn { margin-top: 6px; }

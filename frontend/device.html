@@ -50,6 +50,13 @@
       </div>
 
       <div class="side-group">
+        <div class="side-label">Remote ADB</div>
+        <div class="side-buttons">
+          <button id="remote-btn">🔗 Connect from another computer</button>
+        </div>
+      </div>
+
+      <div class="side-group">
         <div class="side-label">Stream</div>
         <div class="side-buttons">
           <button id="reload-stream">↻ Reload view</button>
@@ -75,6 +82,37 @@
       </div>
     </main>
   </div>
+
+  <!-- Remote ADB modal -->
+  <div id="remote-modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Remote ADB — <span id="rm-name"></span></strong>
+        <button id="rm-close" class="ghost">✕</button>
+      </div>
+      <p class="modal-sub">Connect the ADB terminal on any computer to this emulator, so tools (Claude Code, Android Studio, scripts) can drive it and test apps.</p>
+
+      <div class="rm-fields">
+        <label>Server host / IP <input id="rm-host" /></label>
+        <label>SSH user <input id="rm-user" placeholder="your-ssh-user" /></label>
+        <label>SSH port <input id="rm-sshport" type="number" value="22" /></label>
+      </div>
+
+      <h4>Recommended — secure SSH tunnel <span class="tag">works anywhere the server is SSH-reachable</span></h4>
+      <p class="modal-sub">Run this on the other computer (needs <code>adb</code> + SSH access to the server). Keeps ADB private; nothing is exposed to the network.</p>
+      <pre id="rm-tunnel" class="cmd"></pre>
+      <button class="copy-btn" data-copy="rm-tunnel">Copy tunnel commands</button>
+
+      <h4>Direct connection <span class="tag warn-tag">unauthenticated — trusted networks / VPN only</span></h4>
+      <label class="side-check"><input type="checkbox" id="rm-expose" /> Expose ADB on the network (reboots the device)</label>
+      <p class="modal-sub">When exposed and the port is reachable (e.g. a VPS with the firewall opened), connect directly:</p>
+      <pre id="rm-direct" class="cmd"></pre>
+      <button class="copy-btn" data-copy="rm-direct">Copy direct command</button>
+
+      <p id="rm-msg" class="modal-sub"></p>
+    </div>
+  </div>
+
   <script src="device.js"></script>
 </body>
 </html>

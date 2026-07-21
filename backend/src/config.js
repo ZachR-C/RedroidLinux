@@ -32,6 +32,14 @@ export const config = {
   // so from the host (or a host-network container) devices are 127.0.0.1:<port>.
   adbHost: process.env.ADB_HOST || '127.0.0.1',
 
+  // How remote machines reach THIS server for remote-ADB (SSH tunnel / direct).
+  // publicHost auto-detects the primary IP when empty; override for a VPS with a
+  // domain or a specific public IP. sshUser is shown in the generated tunnel
+  // command (editable in the UI too).
+  publicHost: process.env.PUBLIC_HOST || '',
+  sshUser: process.env.SSH_USER || '',
+  sshPort: parseInt(process.env.SSH_PORT || '22', 10),
+
   // Base URL of the ws-scrcpy web UI used for in-browser manual control.
   // Empty => the frontend derives it from window.location (same host, this port).
   wsScrcpyUrl: process.env.WS_SCRCPY_URL || '',

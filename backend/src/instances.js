@@ -1,6 +1,7 @@
 // Instance lifecycle: each "device" is one privileged redroid container plus a
 // persistent /data volume folder and a unique published ADB port.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import Docker from 'dockerode';
@@ -64,7 +65,11 @@ function containerSpec(rec) {
       // Ubuntu 24.04 / 6.8) and let redroid's own init wire up /dev/binder from
       // it. Mapping individual nodes causes an early-boot race that aborts vold.
       Binds: [`${rec.dataPath}:/data`, '/dev/binderfs:/dev/binderfs'],
-      PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(rec.adbPort) }] },
+      // Bind ADB to localhost by default (secure; reach it via SSH tunnel). When
+      // `exposed`, bind to 0.0.0.0 so remote machines can adb-connect directly.
+      PortBindings: {
+        '5555/tcp': [{ HostIp: rec.exposed ? '0.0.0.0' : '127.0.0.1', HostPort: String(rec.adbPort) }],
+      },
       RestartPolicy: { Name: 'no' },
     },
     ExposedPorts: { '5555/tcp': {} },
@@ -137,6 +142,53 @@ export async function remove(id, { deleteData = false } = {}) {
   return { id, deletedData: deleteData };
 }
 
+// Remove and re-create the device container from `rec` (new image / port bind /
+// geometry), then start + adb-connect. Persists rec. Reboots the emulator.
+async function recreate(rec) {
+  await adb.disconnect(rec.adbPort).catch(() => {});
+  try { await docker.getContainer(containerName(rec.id)).remove({ force: true }); } catch {}
+  await docker.createContainer(containerSpec(rec));
+  await docker.getContainer(containerName(rec.id)).start();
+  await adb.connect(rec.adbPort);
+  store.put(rec);
+  return rec;
+}
+
+// Best-effort primary IPv4 of this host (backend runs with host networking, so
+// these are the server's real interfaces). Used as the default remote host.
+function primaryHost() {
+  const ifaces = os.networkInterfaces();
+  for (const list of Object.values(ifaces)) {
+    for (const a of list || []) {
+      if (a.family === 'IPv4' && !a.internal) return a.address;
+    }
+  }
+  return 'localhost';
+}
+
+// Connection info for reaching this device's ADB from another computer.
+export async function remoteInfo(id) {
+  const rec = mustGet(id);
+  const host = config.publicHost || primaryHost();
+  return {
+    adbPort: rec.adbPort,
+    exposed: !!rec.exposed,
+    host,
+    sshUser: config.sshUser,
+    sshPort: config.sshPort,
+    autodetectedHost: primaryHost(),
+  };
+}
+
+// Toggle whether ADB is published on 0.0.0.0 (reachable from the network) vs
+// 127.0.0.1 (localhost only). Recreates the container, so the device reboots.
+export async function setExposed(id, exposed) {
+  const rec = mustGet(id);
+  if (!!rec.exposed === !!exposed) return get(id);
+  await recreate({ ...rec, exposed: !!exposed });
+  return get(id);
+}
+
 // Install an APK (already saved to filePath) onto a running device via adb.
 export async function installApk(id, filePath) {
   const rec = mustGet(id);
@@ -207,13 +259,8 @@ async function doRoot(rec) {
   await runRooter(rec.image, outImage);
 
   // 2) Recreate the device container on the rooted image (keep /data & port).
-  await adb.disconnect(rec.adbPort).catch(() => {});
-  try { await docker.getContainer(containerName(rec.id)).remove({ force: true }); } catch {}
   const rooted = { ...rec, image: outImage, rootState: 'rooted', rooted: true };
-  await docker.createContainer(containerSpec(rooted));
-  await docker.getContainer(containerName(rec.id)).start();
-  await adb.connect(rooted.adbPort);
-  store.put(rooted);
+  await recreate(rooted);
   console.log(`[root] ${rec.id} rooted on ${outImage}`);
 
   // Best-effort: once booted, make sure the Magisk manager app is installed so
