@@ -94,6 +94,27 @@ The user wants changes tested on the real VM, not just locally:
 - The rooter needs internet (downloads Magisk from GitHub) and the docker socket.
   Rebuild it after changing `rooter/`: `docker compose --profile rooter build rooter`.
 
+## Remote ADB (from another computer) — verified
+- `GET /api/instances/:id/remote` returns `{serial, adbPort, host, sshUser,
+  sshPort, adbServerPort:5037}`. The device serial is `127.0.0.1:<adbPort>` as
+  seen on the server.
+- The working method (device console → "Connect from another computer"): SSH-
+  tunnel the host's **adb server** and drive it as a client — NOT the raw device
+  port:
+  ```
+  ssh -N -L 15037:127.0.0.1:5037 <user>@<host>
+  export ANDROID_ADB_SERVER_PORT=15037
+  adb devices                       # shows 127.0.0.1:<adbPort>
+  adb -s 127.0.0.1:<adbPort> shell ...
+  ```
+- WHY not tunnel the raw device port: redroid's adbd allows only one adb server
+  transport, and the host's adb server (shared by ws-scrcpy + management) already
+  holds it — a second server via the raw port gets `device offline` / protocol
+  reset. Tunnelling 5037 shares that one server, so it coexists. Verified from a
+  separate machine (the Mac) against the VM. One tunnel exposes all emulators.
+- Config `PUBLIC_HOST` / `SSH_USER` / `SSH_PORT` prefill the UI (host auto-detects
+  via host-network interfaces). Requires matching-ish adb versions on both ends.
+
 ## Known gaps / TODO ideas
 - No auth on the API or ws-scrcpy — keep on private network; add a
   reverse proxy + auth before any VPS exposure.
