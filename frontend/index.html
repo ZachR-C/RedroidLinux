@@ -22,6 +22,10 @@
         <label>Height <input name="height" type="number" value="1280" /></label>
         <label>DPI <input name="dpi" type="number" value="320" /></label>
         <label>FPS <input name="fps" type="number" value="30" /></label>
+        <label class="check-inline" id="gapps-label">
+          <input type="checkbox" name="gapps" id="gapps-check" />
+          <span>Google Apps<br /><small id="gapps-note">(MindTheGapps)</small></span>
+        </label>
         <button type="submit" class="primary">Create</button>
       </form>
       <p class="msg">On Apple Silicon use a <strong>64-bit only</strong> image — the “full” images have no 32-bit ARM support here and won’t boot. Images download on first use.</p>

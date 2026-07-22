@@ -13,6 +13,20 @@ async function loadConfig() {
   const sel = $('#image-select');
   sel.innerHTML = cfg.images
     .map((i) => `<option value="${i.image}">${i.label}</option>`).join('');
+  sel.addEventListener('change', syncGapps);
+  syncGapps();
+}
+
+// Google Apps is only available for Android versions MindTheGapps builds for.
+function syncGapps() {
+  const img = $('#image-select').value;
+  const entry = cfg.images.find((i) => i.image === img);
+  const ok = !!(entry && entry.gapps);
+  const box = $('#gapps-check');
+  box.disabled = !ok;
+  if (!ok) box.checked = false;
+  $('#gapps-label').classList.toggle('disabled', !ok);
+  $('#gapps-note').textContent = ok ? '(MindTheGapps)' : '(not available for this version)';
 }
 
 function badge(status) {
@@ -28,6 +42,8 @@ function deviceCard(d) {
     <div class="card-head">
       <strong>${d.name}</strong> ${badge(d.status)}
       ${running && !d.adbOnline ? '<span class="badge idle">booting…</span>' : ''}
+      ${d.gapps ? '<span class="badge ok">GApps</span>' : ''}
+      ${d.rootState === 'rooted' ? '<span class="badge ok">root</span>' : ''}
     </div>
     <div class="meta">
       <div>${d.image}</div>
@@ -60,9 +76,12 @@ $('#create-form').addEventListener('submit', async (e) => {
     image: f.get('image'),
     width: +f.get('width'), height: +f.get('height'),
     dpi: +f.get('dpi'), fps: +f.get('fps'),
+    gapps: f.get('gapps') === 'on',
   };
   const msg = $('#create-msg');
-  msg.textContent = 'Creating…';
+  msg.textContent = payload.gapps
+    ? 'Creating… building the Google Apps image for this Android version (one-time, a few minutes).'
+    : 'Creating… (first use of an Android version downloads it, which can take a minute)';
   try {
     const d = await api('/api/instances', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

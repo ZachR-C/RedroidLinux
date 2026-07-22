@@ -50,6 +50,9 @@ button.ghost { background: transparent; }
 .badge.idle { background: rgba(147,161,176,.15); color: var(--muted); }
 .badge.warn { background: rgba(217,154,43,.18); color: #f0c674; }
 .msg { color: var(--muted); font-size: 13px; }
+.check-inline { flex-direction: row; align-items: center; gap: 8px; padding-bottom: 8px; }
+.check-inline small { color: var(--muted); font-size: 11px; }
+.check-inline.disabled { opacity: .5; }
 /* ---- Device console page ---- */
 .console-body { margin: 0; height: 100vh; overflow: hidden; }
 .console { display: flex; height: 100vh; }

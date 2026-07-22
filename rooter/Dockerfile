@@ -1,7 +1,8 @@
-# One-shot "rooter": injects Magisk into a redroid image using ayasa520's
-# redroid-script (bootless: FROM <base> + COPY magisk /). Launched on demand by
-# the backend via the Docker API; it talks to the host Docker daemon through the
-# mounted socket and produces a <repo>:<tag>_magisk image.
+# One-shot image builder: injects Magisk and/or MindTheGapps into a redroid
+# image using ayasa520's redroid-script (bootless: FROM <base> + COPY <module> /).
+# Launched on demand by the backend via the Docker API; it talks to the host
+# Docker daemon through the mounted socket and produces e.g.
+# <repo>:<tag>_magisk or <repo>:<tag>_gapps.
 FROM python:3.11-slim
 
 RUN apt-get update \
@@ -26,8 +27,8 @@ RUN git clone https://github.com/ayasa520/redroid-script.git \
  && git -C redroid-script checkout "${REDROID_SCRIPT_REF}"
 RUN pip install --no-cache-dir -r redroid-script/requirements.txt
 
-COPY root-device.py /opt/root-device.py
+COPY build-image.py /opt/build-image.py
 
 ENV USER=root XDG_CACHE_HOME=/tmp/cache
 WORKDIR /opt/redroid-script
-ENTRYPOINT ["python", "/opt/root-device.py"]
+ENTRYPOINT ["python", "/opt/build-image.py"]

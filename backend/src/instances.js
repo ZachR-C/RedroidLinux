@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import Docker from 'dockerode';
-import { config } from './config.js';
+import { config, versionKey, supportsGapps } from './config.js';
 import { store } from './store.js';
 import * as adb from './adb.js';
 
@@ -84,7 +84,7 @@ export async function get(id) {
   return decorate(rec);
 }
 
-export async function create({ name, image, width, height, dpi, fps }) {
+export async function create({ name, image, width, height, dpi, fps, gapps }) {
   if (!config.images.some((i) => i.image === image)) throw httpErr(400, `Image not allowed: ${image}`);
   const id = crypto.randomBytes(4).toString('hex');
   const adbPort = allocatePort();
@@ -95,11 +95,16 @@ export async function create({ name, image, width, height, dpi, fps }) {
   // many Android versions without pre-downloading them all.
   await ensureImage(image);
 
+  // Optionally bake in Google Apps. The _gapps image is built once per Android
+  // version and reused by every later device on that version.
+  if (gapps) image = await ensureGappsImage(image);
+
   const rec = {
     id,
     name: (name || `device-${id}`).trim(),
     image,
     baseImage: image, // the un-rooted image; root always builds FROM this
+    gapps: !!gapps,
     adbPort,
     dataPath,
     width: width || 720,
@@ -138,10 +143,10 @@ export async function remove(id, { deleteData = false } = {}) {
   } catch { /* container may already be gone */ }
   if (deleteData) fs.rmSync(rec.dataPath, { recursive: true, force: true });
   store.delete(id);
-  // Reclaim this device's per-device rooted (_magisk) image if nothing else uses
-  // it. Base (-latest) images are left alone — they're shared and re-pulled on
-  // demand anyway.
-  if (/_magisk$/.test(rec.image || '') && !store.all().some((r) => r.image === rec.image)) {
+  // Reclaim built variant images (_magisk / _gapps) once nothing references
+  // them. Pulled base (-latest) images are left alone — they're shared and
+  // re-pulled on demand anyway.
+  if (/_(magisk|gapps)/.test(rec.image || '') && !store.all().some((r) => r.image === rec.image)) {
     try { await docker.getImage(rec.image).remove(); } catch {}
   }
   return { id, deletedData: deleteData };
@@ -236,6 +241,28 @@ function deriveBase(image) {
   return `${repo}:${tag}-latest`;
 }
 
+// Google Apps image tag: repo:13.0.0_64only-latest -> repo:13.0.0_64only_gapps.
+function gappsTag(baseImage) {
+  const i = baseImage.lastIndexOf(':');
+  return `${baseImage.slice(0, i)}:${baseImage.slice(i + 1).replace(/-latest$/, '')}_gapps`;
+}
+
+// Build (once per Android version) a MindTheGapps variant of `baseImage` and
+// return its tag. Reused by every later device on the same version.
+async function ensureGappsImage(baseImage) {
+  if (!supportsGapps(baseImage)) {
+    throw httpErr(400,
+      `Google Apps isn't available for ${versionKey(baseImage)}. ` +
+      'MindTheGapps ships builds for Android 15/14/13/12 (and 13/12 _64only).');
+  }
+  const out = gappsTag(baseImage);
+  try { await docker.getImage(out).inspect(); return out; } catch { /* build it */ }
+  console.log(`[gapps] building ${out} from ${baseImage}`);
+  await runBuilder(baseImage, out, ['mindthegapps']);
+  await pruneDangling();
+  return out;
+}
+
 // Magisk image tag for a base: repo:13.0.0_64only-latest -> repo:13.0.0_64only_magisk.
 function rootedTag(baseImage) {
   const i = baseImage.lastIndexOf(':');
@@ -274,7 +301,7 @@ async function doRoot(rec) {
   const outImage = rootedTag(base);
 
   // 1) Build the Magisk image via the one-shot rooter container.
-  await runRooter(base, outImage);
+  await runBuilder(base, outImage, ['magisk']);
 
   // 2) Recreate the device container on the rooted image (keep /data & port).
   const oldImage = rec.image;
@@ -299,12 +326,18 @@ async function ensureMagiskApp(adbPort) {
   await adb.shell(adbPort, 'su 0 pm install -r /system/etc/init/magisk/magisk.apk');
 }
 
-// Launch the rooter image as a one-off container and wait for it to finish.
-async function runRooter(baseImage, outImage) {
+// Launch the one-shot builder image and wait for it to finish. `modules` is a
+// list of redroid-script modules to inject (magisk, mindthegapps).
+async function runBuilder(baseImage, outImage, modules) {
   await ensureRooterImage();
   const container = await docker.createContainer({
     Image: 'redroid-rooter',
-    Env: [`BASE_IMAGE=${baseImage}`, `OUTPUT_IMAGE=${outImage}`],
+    Env: [
+      `BASE_IMAGE=${baseImage}`,
+      `OUTPUT_IMAGE=${outImage}`,
+      `MODULES=${modules.join(',')}`,
+      `ANDROID_VERSION=${versionKey(baseImage)}`,
+    ],
     HostConfig: {
       AutoRemove: false,
       Binds: ['/var/run/docker.sock:/var/run/docker.sock'],
@@ -315,7 +348,7 @@ async function runRooter(baseImage, outImage) {
   const logs = (await container.logs({ stdout: true, stderr: true })).toString();
   await container.remove({ force: true }).catch(() => {});
   if (status.StatusCode !== 0) {
-    throw new Error(`rooter exited ${status.StatusCode}\n${logs.slice(-2000)}`);
+    throw new Error(`builder exited ${status.StatusCode}\n${logs.slice(-2000)}`);
   }
 }
 
