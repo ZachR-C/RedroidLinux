@@ -36,17 +36,19 @@ function badge(status) {
 
 function deviceCard(d) {
   const running = d.status === 'running';
-  // View opens whenever running; the console itself waits for boot_completed
-  // before streaming (so it never shows the dead grey view), and stays reachable
-  // for a hung device so Safe Mode can recover it.
-  const canView = running;
+  // View is enabled only once Android reports boot_completed. adbd comes up long
+  // before the display stack, so streaming earlier gives a dead grey view — the
+  // button stays greyed with "booting…" until it's genuinely ready.
+  const canView = running && d.booted;
+  const booting = running && !d.booted;
+  const rooted = d.rootState === 'rooted';
   return `
   <div class="card" data-id="${d.id}">
     <div class="card-head">
       <strong>${d.name}</strong> ${badge(d.status)}
-      ${running && !d.booted ? '<span class="badge idle">booting…</span>' : ''}
+      ${booting ? '<span class="badge idle">booting…</span>' : ''}
       ${d.gapps ? '<span class="badge ok">GApps</span>' : ''}
-      ${d.rootState === 'rooted' ? '<span class="badge ok">root</span>' : ''}
+      ${rooted ? '<span class="badge ok">root</span>' : ''}
     </div>
     <div class="meta">
       <div>${d.image}</div>
@@ -58,7 +60,8 @@ function deviceCard(d) {
         ? `<button data-act="stop">Stop</button>`
         : `<button data-act="start" class="primary">Start</button>`}
       <button data-act="view" ${canView ? '' : 'disabled'}
-        title="${running && !d.booted ? 'Opens now; the screen appears once Android finishes booting' : 'Open the live screen'}">View</button>
+        title="${booting ? 'Available once Android finishes booting' : 'Open the live screen'}">View</button>
+      ${booting && rooted ? '<button data-act="safemode" class="danger" title="If it is stuck booting (e.g. a bad Magisk module), disable all modules and reboot">🛟 Safe mode</button>' : ''}
       <button data-act="delete" class="danger">Delete</button>
     </div>
   </div>`;
@@ -115,6 +118,9 @@ $('#list').addEventListener('click', async (e) => {
       // Go straight to the dedicated console page (auto-streams + sidebar tools).
       window.location.href = `/device.html?id=${encodeURIComponent(id)}`;
       return;
+    } else if (act === 'safemode') {
+      if (!confirm('Stuck booting? Disable ALL Magisk modules and reboot this device?')) { btn.disabled = false; return; }
+      await api(`/api/instances/${id}/safe-mode`, { method: 'POST' });
     }
     await refresh();
   } catch (err) { alert('Error: ' + err.message); }
