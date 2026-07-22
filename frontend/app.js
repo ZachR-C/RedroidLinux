@@ -119,6 +119,110 @@ $('#list').addEventListener('click', async (e) => {
 
 $('#refresh').addEventListener('click', refresh);
 
+// ---- storage manager ----
+const fmt = (b) => {
+  if (!b) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(b) / Math.log(1024));
+  return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i];
+};
+
+async function loadStorage() {
+  const s = await api('/api/storage');
+  if (s.disk) {
+    const cls = s.disk.pct >= 90 ? 'bad' : s.disk.pct >= 75 ? 'warn' : 'ok';
+    $('#st-disk').innerHTML = `
+      <div class="st-bar"><div class="st-fill ${cls}" style="width:${s.disk.pct}%"></div></div>
+      <p class="msg"><strong>${fmt(s.disk.used)}</strong> used of ${fmt(s.disk.total)}
+        · <strong>${fmt(s.disk.free)}</strong> free (${s.disk.pct}%)</p>`;
+  }
+  $('#st-bc-size').textContent = `(${fmt(s.buildCache)})`;
+  $('#st-dg-size').textContent = `(${s.danglingCount} · ${fmt(s.danglingBytes)})`;
+  $('#st-un-size').textContent = `(${fmt(s.unusedImageBytes)})`;
+  $('#st-or-size').textContent = `(${s.orphans.length} · ${fmt(s.orphanBytes)})`;
+
+  $('#st-images').innerHTML = s.images.length ? s.images.map((i) => `
+    <div class="st-row">
+      <label>
+        <input type="checkbox" class="st-img" value="${i.tag}" ${i.inUse ? 'disabled' : ''} />
+        <code>${i.tag}</code>
+      </label>
+      <span>${fmt(i.size)} ${i.inUse ? '<span class="badge ok">in use</span>' : '<span class="badge idle">unused</span>'}</span>
+    </div>`).join('') : '<p class="msg">No Android images.</p>';
+
+  $('#st-devices').innerHTML = s.devices.length ? s.devices.map((d) => `
+    <div class="st-row">
+      <span><strong>${d.name}</strong>
+        ${d.gapps ? '<span class="badge ok">GApps</span>' : ''}
+        ${d.rootState === 'rooted' ? '<span class="badge ok">root</span>' : ''}
+        <br /><code class="muted">${d.image}</code></span>
+      <span>${fmt(d.dataSize)}
+        <button data-wipe="${d.id}" class="ghost">Wipe</button>
+        <button data-del="${d.id}" class="danger">Delete</button>
+      </span>
+    </div>`).join('') : '<p class="msg">No devices.</p>';
+}
+
+$('#storage-btn').addEventListener('click', async () => {
+  $('#storage-modal').classList.remove('hidden');
+  $('#st-msg').textContent = 'Loading…';
+  await loadStorage();
+  $('#st-msg').textContent = '';
+});
+$('#st-close').addEventListener('click', () => $('#storage-modal').classList.add('hidden'));
+
+$('#st-run').addEventListener('click', async () => {
+  const targets = [];
+  if ($('#st-buildcache').checked) targets.push('buildCache');
+  if ($('#st-dangling').checked) targets.push('dangling');
+  if ($('#st-unused').checked) targets.push('unusedImages');
+  if ($('#st-orphans').checked) targets.push('orphans');
+  if (!targets.length) { $('#st-msg').textContent = 'Nothing selected.'; return; }
+  $('#st-msg').textContent = '⏳ Reclaiming…';
+  try {
+    const r = await api('/api/storage/prune', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targets }),
+    });
+    $('#st-msg').textContent = `✅ Reclaimed ${fmt(r.reclaimed)}.`;
+    await loadStorage();
+  } catch (e) { $('#st-msg').textContent = '❌ ' + e.message; }
+});
+
+$('#st-del-images').addEventListener('click', async () => {
+  const imgs = [...document.querySelectorAll('.st-img:checked')].map((c) => c.value);
+  if (!imgs.length) { $('#st-msg').textContent = 'No images checked.'; return; }
+  if (!confirm(`Delete ${imgs.length} image(s)?\n\nThey re-download automatically if a device needs them again.`)) return;
+  $('#st-msg').textContent = '⏳ Deleting…';
+  try {
+    const r = await api('/api/storage/prune', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: imgs }),
+    });
+    $('#st-msg').textContent = `✅ Reclaimed ${fmt(r.reclaimed)}.`;
+    await loadStorage();
+  } catch (e) { $('#st-msg').textContent = '❌ ' + e.message; }
+});
+
+$('#st-devices').addEventListener('click', async (e) => {
+  const wipe = e.target.closest('button[data-wipe]');
+  const del = e.target.closest('button[data-del]');
+  try {
+    if (wipe) {
+      if (!confirm('Factory-reset this device?\n\nStops it and erases all apps & settings. The device itself is kept.')) return;
+      $('#st-msg').textContent = '⏳ Wiping…';
+      await api(`/api/instances/${wipe.dataset.wipe}/wipe`, { method: 'POST' });
+    } else if (del) {
+      if (!confirm('Delete this device and its data permanently?')) return;
+      $('#st-msg').textContent = '⏳ Deleting…';
+      await api(`/api/instances/${del.dataset.del}?data=true`, { method: 'DELETE' });
+    } else return;
+    $('#st-msg').textContent = '✅ Done.';
+    await loadStorage();
+    await refresh();
+  } catch (err) { $('#st-msg').textContent = '❌ ' + err.message; }
+});
+
 // ---- boot -----------------------------------------------------------------
 (async () => {
   await loadConfig();

@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import * as instances from './instances.js';
+import * as storage from './storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -69,6 +70,12 @@ app.post('/api/instances/:id/push', (req, res) => {
 });
 app.delete('/api/instances/:id', wrap(async (req, res) =>
   res.json(await instances.remove(req.params.id, { deleteData: req.query.data === 'true' }))));
+
+// --- storage manager ---
+app.get('/api/storage', wrap(async (req, res) => res.json(await storage.info())));
+app.post('/api/storage/prune', wrap(async (req, res) => res.json(await storage.prune(req.body || {}))));
+// Wipe a device's /data (factory reset) without deleting the device itself.
+app.post('/api/instances/:id/wipe', wrap(async (req, res) => res.json(await instances.wipeData(req.params.id))));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

@@ -166,6 +166,17 @@ export async function remove(id, { deleteData = false } = {}) {
   return { id, deletedData: deleteData };
 }
 
+// Factory-reset: stop the device and empty its /data volume, keeping the device
+// itself. Reclaims everything the apps/state were using.
+export async function wipeData(id) {
+  const rec = mustGet(id);
+  await adb.disconnect(rec.adbPort).catch(() => {});
+  try { await docker.getContainer(containerName(id)).stop({ t: 5 }); } catch {}
+  fs.rmSync(rec.dataPath, { recursive: true, force: true });
+  fs.mkdirSync(rec.dataPath, { recursive: true });
+  return get(id);
+}
+
 // Remove and re-create the device container from `rec` (new image / port bind /
 // geometry), then start + adb-connect. Persists rec. Reboots the emulator.
 async function recreate(rec) {

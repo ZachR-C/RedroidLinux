@@ -53,6 +53,20 @@ button.ghost { background: transparent; }
 .check-inline { flex-direction: row; align-items: center; gap: 8px; padding-bottom: 8px; }
 .check-inline small { color: var(--muted); font-size: 11px; }
 .check-inline.disabled { opacity: .5; }
+/* Storage manager */
+.muted { color: var(--muted); }
+.st-bar { height: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.st-fill { height: 100%; background: var(--ok); }
+.st-fill.warn { background: var(--warn); }
+.st-fill.bad { background: var(--danger); }
+.st-actions { display: grid; gap: 8px; margin: 10px 0; }
+.st-actions label { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.st-table { border: 1px solid var(--line); border-radius: 8px; max-height: 240px; overflow-y: auto; margin-bottom: 8px; }
+.st-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.st-row:last-child { border-bottom: 0; }
+.st-row label { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.st-row code { font-size: 12px; }
+.st-row button { padding: 4px 10px; font-size: 12px; margin-left: 6px; }
 /* ---- Device console page ---- */
 .console-body { margin: 0; height: 100vh; overflow: hidden; }
 .console { display: flex; height: 100vh; }

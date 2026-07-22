@@ -35,11 +35,45 @@
     <section class="panel">
       <div class="row-between">
         <h2>Devices</h2>
-        <button id="refresh" class="ghost">↻ Refresh</button>
+        <div style="display:flex;gap:8px">
+          <button id="storage-btn" class="ghost">💾 Storage</button>
+          <button id="refresh" class="ghost">↻ Refresh</button>
+        </div>
       </div>
       <div id="list" class="devices"></div>
     </section>
   </main>
+
+  <!-- Storage manager -->
+  <div id="storage-modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>💾 Storage manager</strong>
+        <button id="st-close" class="ghost">✕</button>
+      </div>
+
+      <div id="st-disk"></div>
+
+      <h4>Quick reclaim <span class="tag">safe — nothing in use is touched</span></h4>
+      <div class="st-actions">
+        <label><input type="checkbox" id="st-buildcache" checked /> Build cache <span id="st-bc-size" class="muted"></span></label>
+        <label><input type="checkbox" id="st-dangling" checked /> Dangling images <span id="st-dg-size" class="muted"></span></label>
+        <label><input type="checkbox" id="st-unused" /> Unused Android images <span id="st-un-size" class="muted"></span></label>
+        <label><input type="checkbox" id="st-orphans" /> Orphaned data folders <span id="st-or-size" class="muted"></span></label>
+      </div>
+      <button id="st-run" class="primary">Reclaim selected</button>
+      <p id="st-msg" class="msg"></p>
+
+      <h4>Android images</h4>
+      <p class="msg">Images are shared by every device using them — deleting one only frees space if no device needs it. Unused ones re-download automatically when needed.</p>
+      <div id="st-images" class="st-table"></div>
+      <button id="st-del-images" class="danger">Delete checked images</button>
+
+      <h4>Device data</h4>
+      <p class="msg">Each device's <code>/data</code> (apps &amp; settings). “Wipe” factory-resets a device but keeps it; “Delete” removes the device entirely.</p>
+      <div id="st-devices" class="st-table"></div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
