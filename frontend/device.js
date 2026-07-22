@@ -49,8 +49,9 @@ function renderPlayers() {
 }
 
 function loadStream() {
-  if (!device) return;
+  if (!device || !device.booted) return; // never connect scrcpy before boot completes
   const url = streamUrl(device.serial, currentPlayer);
+  $('#stream-status').textContent = '';
   $('#stream-frame').src = url;
   $('#open-tab').href = url;
   renderPlayers();
@@ -73,12 +74,34 @@ async function boot() {
   $('#dev-name').textContent = device.name;
   $('#dev-serial').textContent = device.serial;
   renderStatus();
-  if (device.status !== 'running' || !device.adbOnline) {
-    $('#side-msg').innerHTML =
-      'Device is not online yet. <a href="/">Go back</a>, Start it, and wait for “running”.';
+
+  // Never start the stream before Android reports boot_completed: scrcpy
+  // connected too early produces a grey view that never recovers.
+  if (!device.booted) {
+    const ok = await waitUntilBooted();
+    if (!ok) return;
   }
   loadStream();
   pollRoot();
+}
+
+// Poll until the device reports booted. Returns false if it isn't running.
+async function waitUntilBooted() {
+  for (;;) {
+    if (device.status !== 'running') {
+      $('#side-msg').innerHTML =
+        'Device is not running. <a href="/">Go back</a> and press Start.';
+      $('#stream-status').textContent = 'Not running';
+      return false;
+    }
+    $('#stream-status').innerHTML =
+      '<span class="spinner"></span> Waiting for Android to finish booting…<br>'
+      + '<small>The screen opens automatically — starting it earlier gives a blank view.</small>';
+    await new Promise((r) => setTimeout(r, 3000));
+    device = await api(`/api/instances/${id}`);
+    renderStatus();
+    if (device.booted) { $('#stream-status').textContent = ''; return true; }
+  }
 }
 
 function renderStatus() {
@@ -142,7 +165,14 @@ $('#tool-close').addEventListener('click', () => {
   $('#tool-panel').classList.add('hidden');
   $('#tool-frame').src = 'about:blank';
 });
-$('#reload-stream').addEventListener('click', loadStream);
+// Re-check state first: the device may have been rebooted/stopped meanwhile.
+$('#reload-stream').addEventListener('click', async () => {
+  $('#stream-frame').src = 'about:blank';
+  device = await api(`/api/instances/${id}`);
+  renderStatus();
+  if (!device.booted && !(await waitUntilBooted())) return;
+  loadStream();
+});
 
 // ---- Remote ADB modal ----
 let remote = null;

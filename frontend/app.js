@@ -36,12 +36,14 @@ function badge(status) {
 
 function deviceCard(d) {
   const running = d.status === 'running';
-  const canView = running && d.adbOnline;
+  // Only offer View once Android reports boot_completed — adb alone is up long
+  // before the display stack, and streaming too early gives a dead grey view.
+  const canView = running && d.booted;
   return `
   <div class="card" data-id="${d.id}">
     <div class="card-head">
       <strong>${d.name}</strong> ${badge(d.status)}
-      ${running && !d.adbOnline ? '<span class="badge idle">booting…</span>' : ''}
+      ${running && !d.booted ? '<span class="badge idle">booting…</span>' : ''}
       ${d.gapps ? '<span class="badge ok">GApps</span>' : ''}
       ${d.rootState === 'rooted' ? '<span class="badge ok">root</span>' : ''}
     </div>
@@ -54,7 +56,8 @@ function deviceCard(d) {
       ${running
         ? `<button data-act="stop">Stop</button>`
         : `<button data-act="start" class="primary">Start</button>`}
-      <button data-act="view" ${canView ? '' : 'disabled'}>View</button>
+      <button data-act="view" ${canView ? '' : 'disabled'}
+        title="${canView ? 'Open the live screen' : 'Available once Android finishes booting'}">View</button>
       <button data-act="delete" class="danger">Delete</button>
     </div>
   </div>`;

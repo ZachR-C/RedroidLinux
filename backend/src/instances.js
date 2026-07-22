@@ -21,21 +21,42 @@ function allocatePort() {
   throw new Error('No free ADB port in configured range');
 }
 
+// Devices that have reported sys.boot_completed=1, keyed by container id + the
+// time it started — so a stop/start (same container id, new StartedAt) correctly
+// re-checks instead of trusting a stale "booted".
+const bootedRuns = new Set();
+
+// adbd comes up EARLY in boot, well before SurfaceFlinger/the display stack.
+// Streaming (scrcpy) started before Android is really up yields a dead, grey
+// view that never recovers, so readiness must be sys.boot_completed, not adb.
+async function checkBooted(rec, runKey) {
+  if (!runKey) return false;
+  if (bootedRuns.has(runKey)) return true;
+  const out = (await adb.shell(rec.adbPort, 'getprop sys.boot_completed')).trim();
+  if (out !== '1') return false;
+  bootedRuns.add(runKey);
+  if (bootedRuns.size > 500) bootedRuns.clear(); // bounded
+  return true;
+}
+
 // Merge stored config with live Docker state into the shape the UI consumes.
 async function decorate(rec) {
   let status = 'stopped';
   let containerId = null;
+  let runKey = null;
   try {
     const c = docker.getContainer(containerName(rec.id));
     const info = await c.inspect();
     containerId = info.Id.slice(0, 12);
     status = info.State.Running ? 'running' : 'stopped';
+    runKey = `${info.Id}:${info.State.StartedAt}`;
   } catch {
     status = 'missing'; // record exists but container was removed out-of-band
   }
   const online = status === 'running' ? await adb.isOnline(rec.adbPort) : false;
+  const booted = online ? await checkBooted(rec, runKey) : false;
   return {
-    ...rec, status, containerId, adbOnline: online,
+    ...rec, status, containerId, adbOnline: online, booted,
     serial: adb.serialFor(rec.adbPort),
     rootState: rec.rootState || (rec.rooted ? 'rooted' : 'none'),
   };
