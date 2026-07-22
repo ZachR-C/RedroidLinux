@@ -21,11 +21,15 @@ const dirSize = async (p) => {
 const referencedImages = () => new Set(store.all().map((r) => r.image).filter(Boolean));
 
 export async function info() {
-  const [df, images, statfs] = await Promise.all([
+  const [df, images, containers, statfs] = await Promise.all([
     docker.df().catch(() => null),
     docker.listImages().catch(() => []),
+    docker.listContainers({ all: true }).catch(() => []),
     fs.promises.statfs(config.dataRoot).catch(() => null),
   ]);
+  // Images still referenced by ANY container (even stopped) can't be removed by
+  // Docker, so they must not be reported as reclaimable.
+  const heldByContainer = new Set(containers.map((c) => c.ImageID).filter(Boolean));
 
   const disk = statfs ? {
     total: statfs.blocks * statfs.bsize,
@@ -38,15 +42,19 @@ export async function info() {
   const tagged = [];
   let danglingBytes = 0;
   let danglingCount = 0;
+  let lockedBytes = 0; // untagged but pinned by an existing container
   for (const img of images) {
     const tags = img.RepoTags || [];
+    const held = heldByContainer.has(img.Id);
     if (!tags.length || tags[0] === '<none>:<none>') {
-      danglingCount++; danglingBytes += img.Size || 0;
+      if (held) lockedBytes += img.Size || 0;
+      else { danglingCount++; danglingBytes += img.Size || 0; }
       continue;
     }
     for (const tag of tags) {
       if (!tag.startsWith('redroid/redroid')) continue;
-      tagged.push({ tag, size: img.Size || 0, inUse: inUse.has(tag) });
+      // "in use" = a device record points at it, or a container still holds it.
+      tagged.push({ tag, size: img.Size || 0, inUse: inUse.has(tag) || held });
     }
   }
   tagged.sort((a, b) => b.size - a.size);
@@ -75,6 +83,9 @@ export async function info() {
     images: tagged,
     unusedImageBytes: tagged.filter((t) => !t.inUse).reduce((n, t) => n + t.size, 0),
     danglingCount, danglingBytes,
+    // Old image versions pinned by a device's existing container — only freed by
+    // deleting (or recreating) that device, so not offered as reclaimable.
+    lockedBytes,
     buildCache,
     orphans,
     orphanBytes: orphans.reduce((n, o) => n + o.size, 0),

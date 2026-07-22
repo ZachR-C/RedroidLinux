@@ -140,6 +140,10 @@ async function loadStorage() {
   $('#st-dg-size').textContent = `(${s.danglingCount} · ${fmt(s.danglingBytes)})`;
   $('#st-un-size').textContent = `(${fmt(s.unusedImageBytes)})`;
   $('#st-or-size').textContent = `(${s.orphans.length} · ${fmt(s.orphanBytes)})`;
+  $('#st-locked').innerHTML = s.lockedBytes
+    ? `<span class="muted">${fmt(s.lockedBytes)} is held by older image versions still pinned to existing
+       devices' containers — that space only frees up if you delete those devices.</span>`
+    : '';
 
   $('#st-images').innerHTML = s.images.length ? s.images.map((i) => `
     <div class="st-row">
