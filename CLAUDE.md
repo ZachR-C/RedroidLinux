@@ -128,6 +128,25 @@ The user wants changes tested on the real VM, not just locally:
   left for re-pull on demand.
 - Measured density: ~0.7 GB RAM per running idle instance (Android 14, 720p).
 
+## Magisk modules / bad-module recovery
+- Modules live at `<dataPath>/adb/modules/<id>/` on the host volume, so the
+  backend manages them directly with `fs` (works even mid-bootloop). A `disable`
+  file makes Magisk skip a module; deleting the dir removes it. Changes apply on
+  reboot, so mutations call `restartDevice()`.
+- Endpoints: `GET/POST/DELETE /:id/modules[/:mid]`, `POST /:id/safe-mode`
+  (disable ALL + reboot). Device console has "Manage modules" + a "Safe mode"
+  button (also reachable while a device is bootlooping — View opens whenever
+  running; the console shows the boot spinner, only streams once booted).
+- **Integrity/attestation modules bootloop redroid** (verified: enabling
+  `playintegrityfix`/Integrity-Box never reaches boot_completed; safe-mode
+  recovers it). They assume a real bootloader/TEE. redroid can't pass
+  hardware-backed Play Integrity anyway (container, no keymaster HW attestation),
+  so these are both harmful and pointless here. Zygisk (`zygisksu`) itself is
+  fine — needed for LSPosed.
+- `booted` flag = `getprop sys.boot_completed`, cached per container run
+  (id+StartedAt). It gates streaming so scrcpy never connects before the display
+  stack exists (that produced a permanent grey view).
+
 ## Known gaps / TODO ideas
 - No auth on the API or ws-scrcpy — keep on private network; add a
   reverse proxy + auth before any VPS exposure.
