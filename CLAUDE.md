@@ -137,12 +137,19 @@ The user wants changes tested on the real VM, not just locally:
   (disable ALL + reboot). Device console has "Manage modules" + a "Safe mode"
   button (also reachable while a device is bootlooping — View opens whenever
   running; the console shows the boot spinner, only streams once booted).
-- **Integrity/attestation modules bootloop redroid** (verified: enabling
-  `playintegrityfix`/Integrity-Box never reaches boot_completed; safe-mode
-  recovers it). They assume a real bootloader/TEE. redroid can't pass
-  hardware-backed Play Integrity anyway (container, no keymaster HW attestation),
-  so these are both harmful and pointless here. Zygisk (`zygisksu`) itself is
-  fine — needed for LSPosed.
+- **Integrity/attestation modules bootloop redroid.** Isolated by testing on a
+  14_64only_gapps_magisk device (Magisk Delta 30.6): Zygisk ALONE (Delta
+  built-in, no modules) boots fine; PIF/Integrity-Box + Zygisk (built-in OR
+  ZygiskNext) ALWAYS bootloops; PIF with Zygisk off boots but its GMS hooking is
+  inactive. => the crash is Integrity-Box's own Zygisk injection into GMS
+  faulting in the container, NOT a Zygisk/ZygiskNext conflict and not Zygisk
+  being unsupported. Enable Delta's built-in Zygisk via
+  `sqlite3 <dataPath>/adb/magisk.db "REPLACE INTO settings VALUES('zygisk',1)"`.
+  Even if it loaded, redroid CANNOT pass DEVICE/STRONG Play Integrity (no TEE/HW
+  keymaster attestation — cryptographic, not fixable); BASIC via prop-spoofing
+  only, unreliably. So these modules are a dead end on redroid. Zygisk itself is
+  fine (LSPosed works). To authorize adb on a not-fully-booted device for
+  debugging, write an adb pubkey to `<dataPath>/misc/adb/adb_keys` and restart.
 - `booted` flag = `getprop sys.boot_completed`, cached per container run
   (id+StartedAt). It gates streaming so scrcpy never connects before the display
   stack exists (that produced a permanent grey view).
