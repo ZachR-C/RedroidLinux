@@ -154,7 +154,23 @@ The user wants changes tested on the real VM, not just locally:
   (id+StartedAt). It gates streaming so scrcpy never connects before the display
   stack exists (that produced a permanent grey view).
 
-## Known gaps / TODO ideas
+## In-guest reboot (fixed) + integrity-module reality
+- **Root cause of "device off after reboot" AND many module "bricks":** Android
+  reboots (adb reboot, Magisk's reboot, a module, or vold `reboot_on_failure`)
+  make redroid's init exit the container. With `RestartPolicy: no` Docker left it
+  stopped → device powered off for good. Fixed by `RestartPolicy: unless-stopped`
+  (Stop button still respected) + a reconciler (`instances.reconcile`, startup +
+  every 15s) that upgrades pre-existing containers via `docker update` and
+  reconnects the host adb server after an auto-restart. Verified: `adb reboot`
+  now goes down and back up (~15s).
+- Integrity modules, retested WITH the reboot fix (Magisk Delta, built-in Zygisk):
+  PIF/Integrity-Box + Zygisk now sometimes boots (the old "brick" was partly the
+  reboot-kill) but is **flaky** — injecting into GMS intermittently hangs
+  system_server. **TrickyStore reliably hangs boot** (its keystore-attestation
+  hook deadlocks redroid's software keystore). And DEVICE/STRONG Play Integrity
+  is impossible regardless (no TEE). So: not reliably usable; safe-mode recovers.
+- "Unable to find preinit dir" in module installs is a benign Magisk warning —
+  redroid has no preinit partition; modules still load from /data/adb/modules.
 - No auth on the API or ws-scrcpy — keep on private network; add a
   reverse proxy + auth before any VPS exposure.
 - Binderfs mount + module load are set up idempotently by `provision/setup.sh`
