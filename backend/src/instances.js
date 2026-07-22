@@ -125,7 +125,21 @@ export async function start(id) {
   // Give Android a moment to bring up adbd, then register with the local adb
   // server so ws-scrcpy can see and stream it.
   await adb.connect(rec.adbPort);
+  if (rec.gapps) {
+    ensureGappsProvisioned(rec.adbPort).catch((e) => console.warn('[gapps] provision:', e.message));
+  }
   return get(id);
+}
+
+// GApps images ship Google's setup wizard, which crash-loops on redroid
+// (java.lang.SecurityException: WifiService: Permission denied) and leaves a
+// black/flashing screen with no launcher. Mark the device already-provisioned
+// and disable the wizard so launcher3 becomes home. Idempotent; runs per start.
+async function ensureGappsProvisioned(adbPort) {
+  if (!(await adb.waitBooted(adbPort))) return;
+  await adb.shell(adbPort, 'settings put global device_provisioned 1');
+  await adb.shell(adbPort, 'settings put secure user_setup_complete 1');
+  await adb.shell(adbPort, 'pm disable-user --user 0 com.google.android.setupwizard');
 }
 
 export async function stop(id) {

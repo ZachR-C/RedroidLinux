@@ -33,8 +33,14 @@ if "mindthegapps" in modules:
     from stuff.mindthegapps import MindTheGapps
     if not version:
         sys.exit("ANDROID_VERSION is required for mindthegapps")
-    print(f"[builder] preparing MindTheGapps for {version}", flush=True)
-    MindTheGapps(version).install()
+    # redroid-script only has _64only keys for 13/12, but the _64only images use
+    # the identical arm64 GApps package as the full version — so fall back to the
+    # base version key. That enables GApps on 14/15 _64only too.
+    key = version if version in MindTheGapps.dl_links else version.replace("_64only", "")
+    if key not in MindTheGapps.dl_links:
+        sys.exit(f"MindTheGapps has no build for Android {version}")
+    print(f"[builder] preparing MindTheGapps for {version} (using {key})", flush=True)
+    MindTheGapps(key).install()
     lines.append("COPY mindthegapps /")
 
 if "magisk" in modules:

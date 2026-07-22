@@ -5,13 +5,12 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 
-// Android versions MindTheGapps ships builds for (redroid-script's dl_links
-// keys). Anything else can't get Google Apps, so the UI disables the option.
-// NOTE: on Apple Silicon you need a _64only image, so in practice GApps works
-// on Android 13/12 _64only there.
-export const GAPPS_VERSIONS = new Set([
-  '15.0.0', '14.0.0', '13.0.0', '13.0.0_64only', '12.0.0_64only', '12.0.0',
-]);
+// Android versions MindTheGapps publishes arm64 builds for. The _64only redroid
+// images use the SAME GApps package as their full counterpart (redroid-script's
+// 13.0.0_64only entry points at the identical MindTheGapps-13.0.0-arm64 zip), so
+// we match on the base version and _64only images are covered too — including
+// 14/15 _64only, which redroid-script itself has no key for.
+export const GAPPS_VERSIONS = new Set(['15.0.0', '14.0.0', '13.0.0', '12.0.0']);
 
 // redroid-script version key for an image tag:
 // redroid/redroid:13.0.0_64only-latest -> 13.0.0_64only
@@ -19,7 +18,7 @@ export function versionKey(image) {
   return image.slice(image.lastIndexOf(':') + 1).replace(/-latest$/, '');
 }
 
-export const supportsGapps = (image) => GAPPS_VERSIONS.has(versionKey(image));
+export const supportsGapps = (image) => GAPPS_VERSIONS.has(versionKey(image).replace('_64only', ''));
 
 // REDROID_IMAGES env override: comma-separated image tags. Labels are derived
 // from the tag. Returns null when unset so the built-in list is used.
