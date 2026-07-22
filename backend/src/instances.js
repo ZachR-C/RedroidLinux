@@ -271,9 +271,12 @@ function rootedTag(baseImage) {
   return `${repo}:${tag}_magisk`;
 }
 
-// Remove dangling (untagged) images left behind by rebuilds. Best-effort.
+// Reclaim space left by image builds: dangling (untagged) images plus the
+// buildkit cache, which otherwise grows by GBs across root/gapps builds.
+// Best-effort — never fail an operation because cleanup didn't work.
 async function pruneDangling() {
   try { await docker.pruneImages({ filters: { dangling: ['true'] } }); } catch {}
+  try { await docker.pruneBuilder(); } catch {}
 }
 
 // One-click root: build a Magisk image for this device's Android version, then
