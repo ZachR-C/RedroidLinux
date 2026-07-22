@@ -89,7 +89,12 @@ function containerSpec(rec) {
       // ADB stays bound to localhost on the server; remote machines reach it
       // securely by SSH-tunnelling the host's adb server (see remoteInfo).
       PortBindings: { '5555/tcp': [{ HostIp: '127.0.0.1', HostPort: String(rec.adbPort) }] },
-      RestartPolicy: { Name: 'no' },
+      // Auto-restart so an in-guest reboot (adb reboot, Magisk's reboot, a
+      // module) actually reboots the device instead of powering it off for good:
+      // Android's init exits the container on reboot/shutdown, and without this
+      // Docker would leave it stopped. `unless-stopped` still respects our own
+      // Stop button (it won't resurrect a manually-stopped device).
+      RestartPolicy: { Name: 'unless-stopped' },
     },
     ExposedPorts: { '5555/tcp': {} },
   };
@@ -97,6 +102,27 @@ function containerSpec(rec) {
 
 export async function list() {
   return Promise.all(store.all().map(decorate));
+}
+
+// Keep managed containers healthy:
+//  - ensure the auto-restart policy is set (upgrades devices created before it),
+//  - re-register adb after an in-guest reboot silently restarted the container
+//    (Docker's auto-restart doesn't go through our start(), so nothing had
+//    reconnected the host adb server that ws-scrcpy reads from).
+// Runs on startup and on an interval; best-effort and quiet.
+export async function reconcile() {
+  for (const rec of store.all()) {
+    try {
+      const c = docker.getContainer(containerName(rec.id));
+      const info = await c.inspect();
+      if (info.HostConfig?.RestartPolicy?.Name !== 'unless-stopped') {
+        await c.update({ RestartPolicy: { Name: 'unless-stopped' } }).catch(() => {});
+      }
+      if (info.State.Running && !(await adb.isOnline(rec.adbPort))) {
+        await adb.connect(rec.adbPort).catch(() => {});
+      }
+    } catch { /* container missing — ignore */ }
+  }
 }
 
 export async function get(id) {

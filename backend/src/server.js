@@ -92,4 +92,8 @@ app.use('/', express.static(path.join(__dirname, '..', '..', 'frontend')));
 
 app.listen(config.port, () => {
   console.log(`redroid-manager listening on http://0.0.0.0:${config.port}`);
+  // Upgrade restart policy on existing devices + reconnect adb after in-guest
+  // reboots. Once now, then periodically.
+  instances.reconcile().catch(() => {});
+  setInterval(() => instances.reconcile().catch(() => {}), 15000);
 });
