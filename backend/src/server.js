@@ -77,6 +77,14 @@ app.post('/api/storage/prune', wrap(async (req, res) => res.json(await storage.p
 // Wipe a device's /data (factory reset) without deleting the device itself.
 app.post('/api/instances/:id/wipe', wrap(async (req, res) => res.json(await instances.wipeData(req.params.id))));
 
+// Magisk modules (manage / safe-mode recovery from a bad module).
+app.get('/api/instances/:id/modules', wrap(async (req, res) => res.json(await instances.listModules(req.params.id))));
+app.post('/api/instances/:id/modules/:mid', wrap(async (req, res) =>
+  res.json(await instances.setModuleEnabled(req.params.id, req.params.mid, !!(req.body && req.body.enabled)))));
+app.delete('/api/instances/:id/modules/:mid', wrap(async (req, res) =>
+  res.json(await instances.removeModule(req.params.id, req.params.mid))));
+app.post('/api/instances/:id/safe-mode', wrap(async (req, res) => res.json(await instances.safeMode(req.params.id))));
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve the static management UI.

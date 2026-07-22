@@ -174,6 +174,62 @@ $('#reload-stream').addEventListener('click', async () => {
   loadStream();
 });
 
+// ---- Magisk modules / safe mode ----
+async function renderModules() {
+  const r = await api(`/api/instances/${id}/modules`);
+  const list = $('#mod-list');
+  if (!r.rooted) { list.innerHTML = '<p class="msg">This device isn’t rooted — no Magisk modules.</p>'; return; }
+  if (!r.modules.length) { list.innerHTML = '<p class="msg">No modules installed.</p>'; return; }
+  list.innerHTML = r.modules.map((m) => `
+    <div class="st-row">
+      <span><strong>${m.name}</strong> ${m.version ? `<span class="muted">${m.version}</span>` : ''}
+        ${m.enabled ? '' : '<span class="badge idle">disabled</span>'}
+        <br /><code class="muted">${m.id}</code></span>
+      <span>
+        <button data-mod-toggle="${m.id}" data-on="${m.enabled ? 0 : 1}">${m.enabled ? 'Disable' : 'Enable'}</button>
+        <button data-mod-remove="${m.id}" class="danger">Remove</button>
+      </span>
+    </div>`).join('');
+}
+async function afterModuleChange(promise) {
+  $('#mod-msg').innerHTML = '<span class="spinner"></span> Applying and rebooting the device…';
+  $('#stream-frame').src = 'about:blank';
+  try {
+    await promise;
+    $('#mod-msg').textContent = '✅ Done — device is rebooting.';
+    await renderModules();
+    device = await api(`/api/instances/${id}`);
+    if (!device.booted) await waitUntilBooted();
+    loadStream();
+  } catch (e) { $('#mod-msg').textContent = '❌ ' + (e.message || e); }
+}
+$('#modules-btn').addEventListener('click', async () => {
+  $('#mod-name').textContent = device ? device.name : '';
+  $('#mod-msg').textContent = '';
+  $('#modules-modal').classList.remove('hidden');
+  await renderModules();
+});
+$('#mod-close').addEventListener('click', () => $('#modules-modal').classList.add('hidden'));
+$('#mod-list').addEventListener('click', (e) => {
+  const t = e.target.closest('button[data-mod-toggle]');
+  const rm = e.target.closest('button[data-mod-remove]');
+  if (t) afterModuleChange(api(`/api/instances/${id}/modules/${t.dataset.modToggle}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: t.dataset.on === '1' }),
+  }));
+  else if (rm && confirm(`Remove module "${rm.dataset.modRemove}"? The device will reboot.`)) {
+    afterModuleChange(api(`/api/instances/${id}/modules/${rm.dataset.modRemove}`, { method: 'DELETE' }));
+  }
+});
+const doSafeMode = () => {
+  if (!confirm('Safe mode: disable ALL Magisk modules and reboot?\n\nUse this if the device is stuck after installing a module.')) return;
+  $('#modules-modal').classList.remove('hidden');
+  $('#mod-name').textContent = device ? device.name : '';
+  afterModuleChange(api(`/api/instances/${id}/safe-mode`, { method: 'POST' }));
+};
+$('#mod-safe').addEventListener('click', doSafeMode);
+$('#safemode-btn').addEventListener('click', doSafeMode);
+
 // ---- Remote ADB modal ----
 let remote = null;
 const LOCAL_ADB_PORT = 15037; // local tunnel port; avoids clashing with a local adb server (5037)

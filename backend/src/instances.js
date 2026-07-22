@@ -187,6 +187,95 @@ export async function remove(id, { deleteData = false } = {}) {
   return { id, deletedData: deleteData };
 }
 
+// --- Magisk modules -------------------------------------------------------
+// Modules live at <dataPath>/adb/modules/<id>/ on the host volume, so we can
+// manage them directly (even when the device is bootlooping on a bad module).
+// A module with a `disable` file is skipped by Magisk; deleting its dir removes
+// it. Changes apply on the next boot, so mutations restart the device.
+const modulesDir = (rec) => path.join(rec.dataPath, 'adb', 'modules');
+
+function parseModuleProp(dir) {
+  const out = {};
+  try {
+    for (const line of fs.readFileSync(path.join(dir, 'module.prop'), 'utf8').split('\n')) {
+      const eq = line.indexOf('=');
+      if (eq > 0) out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+    }
+  } catch { /* no module.prop */ }
+  return out;
+}
+
+export async function listModules(id) {
+  const rec = mustGet(id);
+  const root = modulesDir(rec);
+  let entries = [];
+  try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return { rooted: !!rec.rooted, modules: [] }; }
+  const modules = entries.filter((e) => e.isDirectory()).map((e) => {
+    const dir = path.join(root, e.name);
+    const prop = parseModuleProp(dir);
+    return {
+      id: prop.id || e.name,
+      name: prop.name || e.name,
+      version: prop.version || '',
+      description: prop.description || '',
+      enabled: !fs.existsSync(path.join(dir, 'disable')),
+      removePending: fs.existsSync(path.join(dir, 'remove')),
+    };
+  });
+  return { rooted: !!rec.rooted, modules };
+}
+
+function moduleDir(rec, moduleId) {
+  // moduleId is the folder name; guard against path traversal.
+  const safe = String(moduleId).replace(/[/\\]/g, '');
+  const dir = path.join(modulesDir(rec), safe);
+  if (!dir.startsWith(modulesDir(rec) + path.sep)) throw httpErr(400, 'bad module id');
+  if (!fs.existsSync(dir)) throw httpErr(404, `No such module: ${safe}`);
+  return dir;
+}
+
+export async function setModuleEnabled(id, moduleId, enabled, { reboot = true } = {}) {
+  const rec = mustGet(id);
+  const dir = moduleDir(rec, moduleId);
+  const flag = path.join(dir, 'disable');
+  if (enabled) fs.rmSync(flag, { force: true });
+  else fs.writeFileSync(flag, '');
+  if (reboot) await restartDevice(id);
+  return listModules(id);
+}
+
+export async function removeModule(id, moduleId) {
+  const rec = mustGet(id);
+  fs.rmSync(moduleDir(rec, moduleId), { recursive: true, force: true });
+  await restartDevice(id);
+  return listModules(id);
+}
+
+// Safe mode: disable EVERY module, then reboot. The recovery for a device that
+// won't boot because of a bad module (e.g. Play Integrity / TrickyStore).
+export async function safeMode(id) {
+  const rec = mustGet(id);
+  const root = modulesDir(rec);
+  try {
+    for (const e of fs.readdirSync(root, { withFileTypes: true })) {
+      if (e.isDirectory()) fs.writeFileSync(path.join(root, e.name, 'disable'), '');
+    }
+  } catch { /* no modules dir */ }
+  await restartDevice(id);
+  return listModules(id);
+}
+
+// Reboot a device: reconnect adb after. Works whether it's running (restart) or
+// stopped/hung (starts it). The booted cache re-checks via the new StartedAt.
+async function restartDevice(id) {
+  const rec = mustGet(id);
+  await adb.disconnect(rec.adbPort).catch(() => {});
+  const c = docker.getContainer(containerName(id));
+  try { await c.restart({ t: 5 }); }
+  catch { await c.start().catch(() => {}); }
+  await adb.connect(rec.adbPort).catch(() => {});
+}
+
 // Factory-reset: stop the device and empty its /data volume, keeping the device
 // itself. Reclaims everything the apps/state were using.
 export async function wipeData(id) {

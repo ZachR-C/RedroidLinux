@@ -50,6 +50,15 @@
       </div>
 
       <div class="side-group">
+        <div class="side-label">Magisk modules</div>
+        <div class="side-buttons">
+          <button id="modules-btn">Manage modules</button>
+          <button id="safemode-btn" class="danger">🛟 Safe mode (disable all + reboot)</button>
+        </div>
+        <p class="side-hint">Stuck after installing a module? Safe mode disables all modules and reboots.</p>
+      </div>
+
+      <div class="side-group">
         <div class="side-label">Remote ADB</div>
         <div class="side-buttons">
           <button id="remote-btn">🔗 Connect from another computer</button>
@@ -111,6 +120,20 @@
 
       <p class="modal-sub" style="margin-top:14px">One tunnel exposes <em>every</em> emulator on this server — use the serial above to pick this one. On a VPS, set <code>PUBLIC_HOST</code>/<code>SSH_USER</code> in <code>.env</code> to prefill these.</p>
       <p id="rm-msg" class="modal-sub"></p>
+    </div>
+  </div>
+
+  <!-- Magisk modules modal -->
+  <div id="modules-modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Magisk modules — <span id="mod-name"></span></strong>
+        <button id="mod-close" class="ghost">✕</button>
+      </div>
+      <p class="modal-sub">Enabling/disabling or removing a module reboots the device to apply. Modules that assume real hardware (Play Integrity, TrickyStore) often break boot on redroid — disable them here if the screen won't come up.</p>
+      <div id="mod-list" class="st-table"></div>
+      <button id="mod-safe" class="danger">🛟 Disable all &amp; reboot (safe mode)</button>
+      <p id="mod-msg" class="modal-sub"></p>
     </div>
   </div>
 
